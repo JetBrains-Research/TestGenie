@@ -58,7 +58,7 @@ class OpenAIRequestManager(project: Project) : IJRequestManager(project) {
                 // check response
                 when (val responseCode = connection.responseCode) {
                     HttpURLConnection.HTTP_OK -> {
-                        assembleLlmResponse(request, testsAssembler, indicator)
+                        assembleLlmResponse(request, testsAssembler, indicator, errorMonitor)
                     }
 
                     HttpURLConnection.HTTP_INTERNAL_ERROR -> {
@@ -115,9 +115,10 @@ class OpenAIRequestManager(project: Project) : IJRequestManager(project) {
         httpRequest: HttpRequests.Request,
         testsAssembler: TestsAssembler,
         indicator: CustomProgressIndicator,
+        errorMonitor: ErrorMonitor,
     ) {
         while (true) {
-            if (ToolUtils.isProcessCanceled(indicator)) return
+            if (ToolUtils.isProcessCanceled(errorMonitor, indicator)) return
 
             var text = httpRequest.reader.readLine()
 

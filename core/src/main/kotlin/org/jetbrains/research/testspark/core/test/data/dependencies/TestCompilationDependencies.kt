@@ -25,6 +25,10 @@ class TestCompilationDependencies {
                 "byte-buddy-agent-1.14.6.jar",
                 "https://repo1.maven.org/maven2/net/bytebuddy/byte-buddy-agent/1.14.6/byte-buddy-agent-1.14.6.jar",
             ),
+            JarLibraryDescriptor(
+                "opentest4j-1.1.1.jar",
+                "https://repo1.maven.org/maven2/org/opentest4j/opentest4j/1.1.1/",
+            ),
         )
     }
 }

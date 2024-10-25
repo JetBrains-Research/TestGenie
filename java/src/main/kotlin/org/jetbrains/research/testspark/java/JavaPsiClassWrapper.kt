@@ -27,6 +27,8 @@ class JavaPsiClassWrapper(private val psiClass: PsiClass) : PsiClassWrapper {
 
     override val allMethods: List<PsiMethodWrapper> get() = psiClass.allMethods.map { JavaPsiMethodWrapper(it) }
 
+    override val constructorSignatures: List<String> get() = psiClass.constructors.map { JavaPsiMethodWrapper.buildSignature(it) }
+
     override val superClass: PsiClassWrapper? get() = psiClass.superClass?.let { JavaPsiClassWrapper(it) }
 
     override val virtualFile: VirtualFile get() = psiClass.containingFile.virtualFile

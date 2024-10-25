@@ -60,8 +60,7 @@ object PromptParserHelper {
     fun isPromptValid(prompt: String): Boolean {
         PromptKeyword.entries.forEach {
             if (it.mandatory) {
-                val text = "\$${it.text}"
-                if (!prompt.contains(text)) {
+                if (!prompt.contains(it.variable)) {
                     return false
                 }
             }

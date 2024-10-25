@@ -35,10 +35,7 @@ class JavaPsiMethodWrapper(private val psiMethod: PsiMethod) : PsiMethodWrapper 
         }
 
     override val signature: String
-        get() {
-            val bodyStart = psiMethod.body?.startOffsetInParent ?: psiMethod.textLength
-            return psiMethod.text.substring(0, bodyStart).replace("\\n", "").trim()
-        }
+        get() = buildSignature(psiMethod)
 
     override val parameterNames: List<String>
         get() = psiMethod.parameterList.parameters.map { it.name }
@@ -124,6 +121,19 @@ class JavaPsiMethodWrapper(private val psiMethod: PsiMethod) : PsiMethodWrapper 
                 "short" -> "S"
                 else -> throw IllegalArgumentException("Unknown type: $it")
             }
+        }
+    }
+
+    companion object {
+        /**
+         * Builds a signature for a given `PsiMethod`.
+         *
+         * @param method the PsiMethod for which to build the signature
+         * @return the method signature with the text before the method body, excluding newline characters
+         */
+        fun buildSignature(method: PsiMethod): String {
+            val bodyStart = method.body?.startOffsetInParent ?: method.textLength
+            return method.text.substring(0, bodyStart).replace("\\n", "").trim()
         }
     }
 }

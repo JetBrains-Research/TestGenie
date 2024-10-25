@@ -3,6 +3,7 @@ package org.jetbrains.research.testspark.display.generatedTests
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindowManager
+import com.intellij.serviceContainer.AlreadyDisposedException
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.content.ContentManager
 import org.jetbrains.research.testspark.bundles.plugin.PluginLabelsBundle
@@ -19,7 +20,6 @@ import java.awt.BorderLayout
 import java.awt.Dimension
 import javax.swing.Box
 import javax.swing.BoxLayout
-import javax.swing.JButton
 import javax.swing.JCheckBox
 import javax.swing.JPanel
 import javax.swing.JSeparator
@@ -46,6 +46,8 @@ class GeneratedTestsTabBuilder(
     fun generatedTestsTabData() = generatedTestsTabData
 
     fun getRemoveAllButton() = generatedTestsTabData.topButtonsPanelBuilder.getRemoveAllButton()
+
+    fun getApplyButton() = generatedTestsTabData.applyButton
 
     /**
      * Displays the generated tests tab in the tool window.
@@ -91,8 +93,6 @@ class GeneratedTestsTabBuilder(
      * Initializes and fills the main panel with subcomponents.
      */
     private fun fillMainPanel() {
-        val applyButton = JButton(PluginLabelsBundle.get("applyButton"))
-
         mainPanel.layout = BorderLayout()
 
         mainPanel.add(
@@ -100,11 +100,10 @@ class GeneratedTestsTabBuilder(
             BorderLayout.NORTH,
         )
         mainPanel.add(generatedTestsTabData.scrollPane, BorderLayout.CENTER)
-        mainPanel.add(applyButton, BorderLayout.SOUTH)
+        mainPanel.add(generatedTestsTabData.applyButton, BorderLayout.SOUTH)
 
-        applyButton.isOpaque = false
-        applyButton.isContentAreaFilled = false
-        applyButton.addActionListener { applyTests() }
+        generatedTestsTabData.applyButton.isOpaque = false
+        generatedTestsTabData.applyButton.isContentAreaFilled = false
     }
 
     /**
@@ -188,7 +187,7 @@ class GeneratedTestsTabBuilder(
     /**
      * Applies the selected test cases by passing them to the display utility for execution.
      */
-    private fun applyTests() {
+    fun applyTests(): Boolean {
         // Filter the selected test cases
         val selectedTestCasePanels =
             generatedTestsTabData.testCaseNameToPanel.filter { (it.value.getComponent(0) as JCheckBox).isSelected }
@@ -199,10 +198,12 @@ class GeneratedTestsTabBuilder(
             .map { generatedTestsTabData.testCaseNameToEditorTextField[it]!! }
             .map { it.document.text }
 
-        displayUtils!!.applyTests(project, uiContext, testCaseComponents)
+        val applyingResult = displayUtils!!.applyTests(project, uiContext, testCaseComponents)
 
         // Remove the selected test cases from the cache and the tool window UI
-        clear()
+        if (applyingResult) clear()
+
+        return applyingResult
     }
 
     /**
@@ -233,9 +234,11 @@ class GeneratedTestsTabBuilder(
      * Closes the tool window by removing the content and hiding the window.
      */
     private fun closeToolWindow() {
-        generatedTestsTabData.contentManager?.removeContent(generatedTestsTabData.content!!, true)
-        ToolWindowManager.getInstance(project).getToolWindow("TestSpark")?.hide()
-        coverageVisualisationTabBuilder.closeToolWindowTab()
+        try {
+            generatedTestsTabData.contentManager?.removeContent(generatedTestsTabData.content!!, true)
+            ToolWindowManager.getInstance(project).getToolWindow("TestSpark")?.hide()
+            coverageVisualisationTabBuilder.closeToolWindowTab()
+        } catch (_: AlreadyDisposedException) {} // Make sure the process continues if the tool window is already closed
     }
 
     /**

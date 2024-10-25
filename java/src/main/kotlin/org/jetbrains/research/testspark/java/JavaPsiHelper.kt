@@ -26,6 +26,19 @@ class JavaPsiHelper(private val psiFile: PsiFile) : PsiHelper {
 
     override val language: SupportedLanguage get() = SupportedLanguage.Java
 
+    /**
+     * When dealing with Java PSI files, we expect that only classes and their methods are tested.
+     * Therefore, we expect a **class** to surround a cursor offset.
+     *
+     * This requirement ensures that the user is not trying
+     * to generate tests for a line of code outside the class scope.
+     *
+     * @param e `AnActionEvent` representing the current action event.
+     * @return `true` if the cursor is inside a class, `false` otherwise.
+     */
+    override fun availableForGeneration(e: AnActionEvent): Boolean =
+        getCurrentListOfCodeTypes(e).any { it.first == CodeType.CLASS }
+
     private val log = Logger.getInstance(this::class.java)
 
     override fun generateMethodDescriptor(psiMethod: PsiMethodWrapper): String {
@@ -70,6 +83,12 @@ class JavaPsiHelper(private val psiFile: PsiFile) : PsiHelper {
     override fun getSurroundingLineNumber(caretOffset: Int): Int? {
         val doc = PsiDocumentManager.getInstance(psiFile.project).getDocument(psiFile) ?: return null
 
+        /**
+         * See `getLineNumber`'s documentation for details on the numbering.
+         * It returns an index of the line in the document, starting from 0.
+         *
+         * Therefore, we need to increase the result by one to get the line number.
+         */
         val selectedLine = doc.getLineNumber(caretOffset)
         val selectedLineText =
             doc.getText(TextRange(doc.getLineStartOffset(selectedLine), doc.getLineEndOffset(selectedLine)))
@@ -79,7 +98,6 @@ class JavaPsiHelper(private val psiFile: PsiFile) : PsiHelper {
             return null
         }
         log.info("Surrounding line at caret $caretOffset is $selectedLine")
-
         // increase by one is necessary due to different start of numbering
         return selectedLine + 1
     }

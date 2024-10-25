@@ -57,7 +57,7 @@ class PromptManager(
     /**
      * The `cut` is null when we work with the function outside the class.
      */
-    private val cut: PsiClassWrapper? = if (classesToTest.isNotEmpty()) classesToTest[0] else null
+    private val cut: PsiClassWrapper? = classesToTest.firstOrNull()
 
     private val llmSettingsState: LLMSettingsState
         get() = project.getService(LLMSettingsService::class.java).state
@@ -124,32 +124,49 @@ class PromptManager(
                     }
 
                     CodeType.LINE -> {
+                        // two possible cases: the line inside a method/function or inside a class
                         val lineNumber = codeType.objectIndex
-                        val psiMethod = getPsiMethod(cut, getMethodDescriptor(cut, lineNumber))!!
-
                         // get code of line under test
-                        val document = psiHelper.getDocumentFromPsiFile()
-                        val lineStartOffset = document!!.getLineStartOffset(lineNumber - 1)
-                        val lineEndOffset = document.getLineEndOffset(lineNumber - 1)
+                        val lineUnderTest = psiHelper.getDocumentFromPsiFile()!!.let { document ->
+                            val lineStartOffset = document.getLineStartOffset(lineNumber - 1)
+                            val lineEndOffset = document.getLineEndOffset(lineNumber - 1)
+                            document.getText(TextRange.create(lineStartOffset, lineEndOffset))
+                        }
 
-                        val lineUnderTest = document.getText(TextRange.create(lineStartOffset, lineEndOffset))
-                        val method = createMethodRepresentation(psiMethod)!!
-                        val interestingClassesFromMethod =
-                            psiHelper.getInterestingPsiClassesWithQualifiedNames(cut, psiMethod)
-                                .map(this::createClassRepresentation)
-                                .toList()
+                        val psiMethod = getMethodDescriptor(cut, lineNumber)?.let { descriptor ->
+                            getPsiMethod(cut, descriptor)
+                        }
+                        /**
+                         * if psiMethod exists, then use it as a context for a line,
+                         * otherwise use the cut as a context
+                         */
+                        if (psiMethod != null) {
+                            val method = createMethodRepresentation(psiMethod)!!
+                            val interestingClassesFromMethod =
+                                psiHelper.getInterestingPsiClassesWithQualifiedNames(cut, psiMethod)
+                                    .map(this::createClassRepresentation)
+                                    .toList()
 
-                        promptGenerator.generatePromptForLine(
-                            lineUnderTest,
-                            method,
-                            interestingClassesFromMethod,
-                            testSamplesCode,
-                        )
+                            return@Computable promptGenerator.generatePromptForLine(
+                                lineUnderTest,
+                                method,
+                                interestingClassesFromMethod,
+                                testSamplesCode,
+                                packageName = psiHelper.getPackageName(),
+                            )
+                        } else {
+                            return@Computable promptGenerator.generatePromptForLine(
+                                lineUnderTest,
+                                interestingClasses,
+                                testSamplesCode,
+                            )
+                        }
                     }
                 }
             },
         ) + LLMSettingsBundle.get("commonPromptPart")
         log.info("Prompt is:\n$prompt")
+        println("Prompt is:\n$prompt")
         return prompt
     }
 
@@ -167,6 +184,7 @@ class PromptManager(
         return ClassRepresentation(
             psiClass.qualifiedName,
             psiClass.fullText,
+            psiClass.constructorSignatures,
             psiClass.allMethods.map(this::createMethodRepresentation).toList().filterNotNull(),
             psiClass.classType,
         )
@@ -282,26 +300,29 @@ class PromptManager(
      *
      * @param psiClass the PsiClassWrapper containing the method
      * @param lineNumber the line number within the file where the method is located
-     * @return the method descriptor as a String, or an empty string if no method is found
+     * @return the method descriptor as `String` if the surrounding method exists, or `null` when no method found
      */
     private fun getMethodDescriptor(
         psiClass: PsiClassWrapper?,
         lineNumber: Int,
-    ): String {
-        // Processing function outside the class
-        if (psiClass == null) {
-            val currentPsiMethod = psiHelper.getSurroundingMethod(caret)!!
+    ): String? {
+        if (psiClass != null) {
+            val containingPsiMethod = psiClass.allMethods.find { it.containsLine(lineNumber) } ?: return null
+
+            val file = psiClass.containingFile
+            val psiHelper = PsiHelperProvider.getPsiHelper(file)
+            /**
+             * psiHelper will not be null here because at this point,
+             * we already know that the current language is supported
+             */
+            return psiHelper!!.generateMethodDescriptor(containingPsiMethod)
+        } else {
+            /**
+             * When no PSI class provided we are dealing with a top-level function.
+             * Processing function outside the class
+             */
+            val currentPsiMethod = psiHelper.getSurroundingMethod(caret) ?: return null
             return psiHelper.generateMethodDescriptor(currentPsiMethod)
         }
-        for (currentPsiMethod in psiClass.allMethods) {
-            if (currentPsiMethod.containsLine(lineNumber)) {
-                val file = psiClass.containingFile
-                val psiHelper = PsiHelperProvider.getPsiHelper(file)
-                // psiHelper will not be null here
-                // because if we are here, then we already know that the current language is supported
-                return psiHelper!!.generateMethodDescriptor(currentPsiMethod)
-            }
-        }
-        return ""
     }
 }

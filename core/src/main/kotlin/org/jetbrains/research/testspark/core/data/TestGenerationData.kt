@@ -1,7 +1,5 @@
 package org.jetbrains.research.testspark.core.data
 
-import org.jetbrains.research.testspark.core.test.data.TestCaseGeneratedByLLM
-
 data class TestGenerationData(
     // Result processing
     // Report object for each test case
@@ -24,14 +22,10 @@ data class TestGenerationData(
     // changing parameters with a large prompt
     var polyDepthReducing: Int = 0,
     var inputParamsDepthReducing: Int = 0,
-
-    // list of correct test cases during the incorrect compilation
-    val compilableTestCases: MutableSet<TestCaseGeneratedByLLM> = mutableSetOf(),
-
 ) {
 
     /**
-     * Cleaning all old data before new test generation.
+     * Cleaning all old data before a new test generation.
      */
     fun clear() {
         testGenerationResultList.clear()
@@ -43,6 +37,5 @@ data class TestGenerationData(
         otherInfo = ""
         polyDepthReducing = 0
         inputParamsDepthReducing = 0
-        compilableTestCases.clear()
     }
 }

@@ -1,5 +1,8 @@
 import org.jetbrains.changelog.markdownToHTML
-import org.jetbrains.intellij.tasks.RunIdeTask
+import org.jetbrains.intellij.platform.gradle.IntelliJPlatformType
+import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import org.jetbrains.intellij.platform.gradle.models.ProductRelease
+import org.jetbrains.intellij.platform.gradle.tasks.RunIdeTask
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.io.FileOutputStream
 import java.net.URL
@@ -25,7 +28,9 @@ plugins {
     // Kotlin support
     id("org.jetbrains.kotlin.jvm") version "1.9.0"
     // Gradle IntelliJ Plugin
-    id("org.jetbrains.intellij") version "1.15.0"
+    id("org.jetbrains.intellij.platform") version "2.1.0"
+    // Gradle IntelliJ Plugin Migration Help (uncomment it for migration tips)
+//    id("org.jetbrains.intellij.platform.migration") version "2.1.0"
     // Gradle Changelog Plugin
     id("org.jetbrains.changelog") version "2.1.2"
     // Gradle Qodana Plugin
@@ -37,6 +42,11 @@ version = properties("pluginVersion")
 // Configure project's dependencies
 repositories {
     mavenCentral()
+    // this part is mandatory for all modules for platform version 2:
+    // See https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-repositories-extension.html#default-repositories
+    intellijPlatform {
+        defaultRepositories()
+    }
     maven("https://packages.jetbrains.team/maven/p/ij/intellij-dependencies")
     maven("https://www.jetbrains.com/intellij-repository/snapshots")
 
@@ -66,6 +76,13 @@ if (spaceCredentialsProvided()) {
         usingSourceSet(hasGrazieAccess)
     }
 
+    // Add the dependencies for the new source set
+    dependencies {
+        add(hasGrazieAccess.implementationConfigurationName, kotlin("stdlib"))
+        add(hasGrazieAccess.implementationConfigurationName, "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+        add(hasGrazieAccess.implementationConfigurationName, "org.jetbrains.research:grazie-test-generation:$grazieTestGenerationVersion")
+    }
+
     tasks.register("checkCredentials") {
         configurations.detachedConfiguration(
             dependencies.create("org.jetbrains.research:grazie-test-generation:$grazieTestGenerationVersion"),
@@ -76,8 +93,12 @@ if (spaceCredentialsProvided()) {
         dependsOn("checkCredentials")
     }
 
+    tasks.named<Jar>(hasGrazieAccess.jarTaskName) {
+        exclude("**/plugin.xml")
+    }
+
     // add build of new source set as the part of UI testing
-    tasks.prepareUiTestingSandbox.configure {
+    tasks.prepareTestSandbox.configure {
         dependsOn(hasGrazieAccess.jarTaskName)
         from(tasks.getByName(hasGrazieAccess.jarTaskName).outputs.files.asPath) { into("TestSpark/lib") }
 
@@ -99,10 +120,25 @@ if (spaceCredentialsProvided()) {
 }
 
 dependencies {
+    // Check platform V2 documentation for more details: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-dependencies-extension.html
+    intellijPlatform {
+        // make a custom version of IDEA
+        create(properties("platformType"), properties("platformVersion"))
+        // Plugin Dependencies. Uses `platformPlugins` property from the gradle.properties file.
+        bundledPlugins(providers.gradleProperty("platformPlugins").map { it.split(',') })
+
+        pluginVerifier()
+        zipSigner()
+        instrumentationTools()
+
+        testFramework(TestFrameworkType.Bundled)
+    }
+
     implementation(files("lib/evosuite-${properties("evosuiteVersion")}.jar"))
     implementation(files("lib/standalone-runtime.jar"))
     implementation(files("lib/jacocoagent.jar"))
     implementation(files("lib/jacococli.jar"))
+    implementation(files("lib/opentest4j-1.1.1.jar"))
     implementation(files("lib/mockito-core-5.0.0.jar"))
     implementation(files("lib/byte-buddy-1.14.6.jar"))
     implementation(files("lib/byte-buddy-agent-1.14.6.jar"))
@@ -129,7 +165,7 @@ dependencies {
     implementation("org.junit.jupiter:junit-jupiter-engine:5.10.0")
 
     // https://mvnrepository.com/artifact/org.jacoco/org.jacoco.core
-    implementation("org.jacoco:org.jacoco.core:0.8.8")
+    implementation("org.jacoco:org.jacoco.core:0.8.12")
     // https://mvnrepository.com/artifact/com.github.javaparser/javaparser-core
     implementation("com.github.javaparser:javaparser-symbol-solver-core:3.24.2")
 
@@ -171,23 +207,41 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-test:1.8.0")
 
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
-
-    if (spaceCredentialsProvided()) {
-        // Dependencies for hasGrazieAccess variant
-        "hasGrazieAccessImplementation"(kotlin("stdlib"))
-        "hasGrazieAccessImplementation"("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
-        "hasGrazieAccessImplementation"("org.jetbrains.research:grazie-test-generation:$grazieTestGenerationVersion")
-    }
 }
 
-// Configure Gradle IntelliJ Plugin - read more: https://github.com/JetBrains/gradle-intellij-plugin
-intellij {
-    pluginName.set(properties("pluginName"))
-    version.set(properties("platformVersion"))
-    type.set(properties("platformType"))
+// Configure Gradle IntelliJ Plugin - read more: // Configure Gradle IntelliJ Plugin - read more: https://github.com/JetBrains/gradle-intellij-plugin
+intellijPlatform {
+    pluginConfiguration {
+        name = properties("pluginName")
+        version = properties("pluginVersion")
 
-    // Plugin Dependencies. Uses `platformPlugins` property from the gradle.properties file.
-    plugins.set(properties("platformPlugins").split(',').map(String::trim).filter(String::isNotEmpty))
+        ideaVersion {
+            sinceBuild = properties("pluginSinceBuild")
+            untilBuild = properties("pluginUntilBuild")
+        }
+    }
+
+    publishing {
+        token = System.getenv("PUBLISH_TOKEN")
+        channels = listOf(properties("pluginVersion").split('-').getOrElse(1) { "default" }.split('.').first())
+    }
+    // Set the ides on which the plugin verification is executed.
+    // See https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-extension.html#intellijPlatform-pluginVerification-ides
+    pluginVerification {
+        ides {
+            recommended()
+            select {
+                types = listOf(IntelliJPlatformType.IntellijIdeaUltimate)
+                channels = listOf(ProductRelease.Channel.RELEASE)
+                sinceBuild = properties("pluginUntilBuild")
+                untilBuild = properties("pluginUntilBuild")
+            }
+        }
+        freeArgs = listOf(
+            "-mute",
+            "TemplateWordInPluginId,ForbiddenPluginIdPrefix"
+        )
+    }
 }
 
 // Configure Gradle Changelog Plugin - read more: https://github.com/JetBrains/gradle-changelog-plugin
@@ -234,11 +288,13 @@ tasks {
         }
     }
 
-    patchPluginXml {
-        version.set(properties("pluginVersion"))
-        sinceBuild.set(properties("pluginSinceBuild"))
-        untilBuild.set(properties("pluginUntilBuild"))
+    signPlugin {
+        certificateChain.set(providers.environmentVariable("CERTIFICATE_CHAIN"))
+        privateKey.set(providers.environmentVariable("PRIVATE_KEY"))
+        password.set(providers.environmentVariable("PRIVATE_KEY_PASSWORD"))
+    }
 
+    patchPluginXml {
         // Extract the <!-- Plugin description --> section from README.md and provide for the plugin's manifest
         pluginDescription.set(
             projectDir.resolve("README.md").readText().lines().run {
@@ -251,44 +307,10 @@ tasks {
                 subList(indexOf(start) + 1, indexOf(end))
             }.joinToString("\n").run { markdownToHTML(this) },
         )
-
-        // Get the latest available change notes from the changelog file
-        changeNotes.set(
-            provider {
-                changelog.run {
-                    getOrNull(properties("pluginVersion")) ?: getLatest()
-                }.toHTML()
-            },
-        )
-    }
-
-    // Configure UI tests plugin
-    // Read more: https://github.com/JetBrains/intellij-ui-test-robot
-    runIdeForUiTests {
-        systemProperty("robot-server.port", "8082")
-        systemProperty("ide.mac.message.dialogs.as.sheets", "false")
-        systemProperty("jb.privacy.policy.text", "<!--999.999-->")
-        systemProperty("jb.consents.confirmation.enabled", "false")
-        systemProperty("idea.trust.all.projects", "true")
-        systemProperty("ide.show.tips.on.startup.default.value", "false")
-        systemProperty("jb.consents.confirmation.enabled", "false")
-        systemProperty("ide.mac.file.chooser.native", "false")
-        systemProperty("apple.laf.useScreenMenuBar", "false")
-    }
-
-    signPlugin {
-        certificateChain.set(System.getenv("CERTIFICATE_CHAIN").trimIndent())
-        privateKey.set(System.getenv("PRIVATE_KEY").trimIndent())
-        password.set(System.getenv("PRIVATE_KEY_PASSWORD"))
     }
 
     publishPlugin {
         dependsOn("patchChangelog")
-        token.set(System.getenv("PUBLISH_TOKEN"))
-        // pluginVersion is based on the SemVer (https://semver.org) and supports pre-release labels, like 2.1.7-alpha.3
-        // Specify pre-release label to publish the plugin in a custom Release Channel automatically. Read more:
-        // https://plugins.jetbrains.com/docs/intellij/deployment.html#specifying-a-release-channel
-        channels.set(listOf(properties("pluginVersion").split('-').getOrElse(1) { "default" }.split('.').first()))
     }
 }
 

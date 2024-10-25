@@ -28,7 +28,7 @@ class JUnitTestSuiteParserStrategy {
                 // save imports
                 val imports = importPattern.findAll(rawCode)
                     .map { it.groupValues[0] }
-                    .toSet()
+                    .toMutableSet()
 
                 // save RunWith
                 val runWith: String = junitVersion.runWithAnnotationMeta.extract(rawCode) ?: ""
@@ -109,7 +109,24 @@ class JUnitTestSuiteParserStrategy {
                     errorOccurred = true,
                 )
             }
-            val interestingPartOfSignature = rawTest.split(testNamePattern)[1]
+
+            /**
+             * The test definition is split into two parts:
+             * [void|fun] <testcase name>() [throws <exception>] { ... }
+             * The first part is the test definition prologue,
+             * the second part is the test definition epilogue.
+             *
+             * Therefore, as an epilogue, we have everything after [void|fun].
+             *
+             * `limit = 2` is used to avoid additional splitting in case if the test
+             * case name starts with the same word as the test definition prologue.
+             */
+            val testCaseEpilogue = rawTest.split(testNamePattern, limit = 2)[1]
+
+            /**
+             * Optional [throws <exception>] part is extracted from the test definition epilogue.
+             */
+            val interestingPartOfSignature = testCaseEpilogue
                 .split("{")[0]
                 .split("()")[1]
                 .trim()
@@ -119,7 +136,7 @@ class JUnitTestSuiteParserStrategy {
             }
 
             // Get test name
-            val testName: String = rawTest.split(testNamePattern)[1]
+            val testName: String = testCaseEpilogue
                 .split("()")[0]
                 .trim()
 

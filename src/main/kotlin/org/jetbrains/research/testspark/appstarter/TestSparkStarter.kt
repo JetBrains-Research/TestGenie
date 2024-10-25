@@ -194,18 +194,20 @@ class TestSparkStarter : ApplicationStarter {
                         )
 
                         // Check test Generation Output
-                        if (uiContext != null && runCoverage) {
+                        if (uiContext != null) {
                             println("[TestSpark Starter] Test generation completed successfully")
                             // Run test file
-                            runTestsWithCoverageCollection(
-                                project,
-                                output,
-                                packageList,
-                                classPath,
-                                projectContext,
-                                projectSDKPath,
-                                testCompiler,
-                            )
+                            if (runCoverage) {
+                                runTestsWithCoverageCollection(
+                                    project,
+                                    output,
+                                    packageList,
+                                    classPath,
+                                    projectContext,
+                                    projectSDKPath,
+                                    testCompiler,
+                                )
+                            }
                         } else {
                             println("[TestSpark Starter] Test generation failed")
                         }

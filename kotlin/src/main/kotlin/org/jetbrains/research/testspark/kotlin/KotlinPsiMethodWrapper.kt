@@ -35,10 +35,7 @@ class KotlinPsiMethodWrapper(val psiFunction: KtFunction) : PsiMethodWrapper {
         }
 
     override val signature: String
-        get() = psiFunction.run {
-            val bodyStart = bodyExpression?.startOffsetInParent ?: textLength
-            text.substring(0, bodyStart).replace('\n', ' ').trim()
-        }
+        get() = buildSignature(psiFunction)
 
     override val parameterNames: List<String>
         get() = psiFunction.valueParameters.map { it.name ?: "" }
@@ -138,6 +135,19 @@ class KotlinPsiMethodWrapper(val psiFunction: KtFunction) : PsiMethodWrapper {
             "Short" -> "S"
             "Unit" -> "V"
             else -> "L${type.replace('.', '/')};"
+        }
+    }
+
+    companion object {
+        /**
+         * Builds a signature for a given Kotlin function by extracting the method body portion.
+         *
+         * @param function The Kotlin function to build the signature for.
+         * @return The signature of the function.
+         */
+        fun buildSignature(function: KtFunction) = function.run {
+            val bodyStart = bodyExpression?.startOffsetInParent ?: textLength
+            text.substring(0, bodyStart).replace('\n', ' ').trim()
         }
     }
 }

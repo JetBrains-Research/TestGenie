@@ -7,6 +7,7 @@ import com.intellij.openapi.roots.ProjectRootManager
 import org.jetbrains.research.testspark.bundles.llm.LLMMessagesBundle
 import org.jetbrains.research.testspark.bundles.plugin.PluginMessagesBundle
 import org.jetbrains.research.testspark.core.data.TestGenerationData
+import org.jetbrains.research.testspark.core.exception.JavaSDKMissingException
 import org.jetbrains.research.testspark.core.generation.llm.FeedbackCycleExecutionResult
 import org.jetbrains.research.testspark.core.generation.llm.LLMWithFeedbackCycle
 import org.jetbrains.research.testspark.core.generation.llm.getImportsCodeFromTestSuiteCode
@@ -50,11 +51,15 @@ class LLMProcessManager(
     private val language: SupportedLanguage,
     private val promptManager: PromptManager,
     private val testSamplesCode: String,
-    private val projectSDKPath: Path? = null,
+    projectSDKPath: Path? = null,
 ) : ProcessManager {
 
-    private val homeDirectory =
-        projectSDKPath?.toString() ?: ProjectRootManager.getInstance(project).projectSdk!!.homeDirectory!!.path
+    private val homeDirectory = projectSDKPath?.toString() ?: run {
+        val sdk = ProjectRootManager.getInstance(project).projectSdk?.homeDirectory?.path
+            ?: throw JavaSDKMissingException(LLMMessagesBundle.get("javaSdkNotConfigured"))
+
+        return@run sdk
+    }
 
     private val testFileName: String = when (language) {
         SupportedLanguage.Java -> "GeneratedTest.java"
@@ -199,12 +204,14 @@ class LLMProcessManager(
         when (feedbackResponse.executionResult) {
             FeedbackCycleExecutionResult.OK -> {
                 log.info("Add ${feedbackResponse.compilableTestCases.size} compilable test cases into generatedTestsData")
-                // store compilable test cases
-                generatedTestsData.compilableTestCases.addAll(feedbackResponse.compilableTestCases)
             }
 
             FeedbackCycleExecutionResult.NO_COMPILABLE_TEST_CASES_GENERATED -> {
-                llmErrorManager.errorProcess(LLMMessagesBundle.get("invalidLLMResult"), project, errorMonitor)
+                if (feedbackResponse.generatedTestSuite != null) {
+                    llmErrorManager.warningProcess(LLMMessagesBundle.get("noCompilableTestCases"), project)
+                } else {
+                    llmErrorManager.errorProcess(LLMMessagesBundle.get("invalidLLMResult"), project, errorMonitor)
+                }
             }
 
             FeedbackCycleExecutionResult.CANCELED -> {

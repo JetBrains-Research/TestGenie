@@ -8,7 +8,7 @@ package org.jetbrains.research.testspark.core.test.data
  * @property testCases The list of test cases in the test suite.
  */
 data class TestSuiteGeneratedByLLM(
-    var imports: Set<String> = emptySet(),
+    var imports: MutableSet<String> = mutableSetOf(),
     var packageName: String = "",
     var runWith: String = "",
     var otherInfo: String = "",

@@ -79,14 +79,18 @@ class TestSparkAction : AnAction() {
     /**
      * Updates the state of the action based on the provided event.
      *
-     * @param e the AnActionEvent object representing the event
+     * @param e `AnActionEvent` object representing the event
      */
     override fun update(e: AnActionEvent) {
-        val file = e.dataContext.getData(CommonDataKeys.PSI_FILE)!!
-        val psiHelper = PsiHelperProvider.getPsiHelper(file)
-        if (psiHelper == null) {
-            // TODO exception
+        val file = e.dataContext.getData(CommonDataKeys.PSI_FILE)
+
+        if (file == null) {
+            e.presentation.isEnabledAndVisible = false
+            return
         }
+
+        val psiHelper = PsiHelperProvider.getPsiHelper(file)
+        e.presentation.isEnabledAndVisible = (psiHelper != null) && psiHelper.availableForGeneration(e)
     }
 
     /**

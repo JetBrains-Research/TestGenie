@@ -83,6 +83,7 @@ class EvoSuiteProcessManager(
             if (ToolUtils.isProcessStopped(errorMonitor, indicator)) return null
 
             val version = ToolUtils.getJavaVersion(evoSuiteSettingsState.javaPath)
+
             if (version == null || version > 11) {
                 evoSuiteErrorManager.errorProcess(EvoSuiteMessagesBundle.get("incorrectJavaVersion"), project, errorMonitor)
                 return null

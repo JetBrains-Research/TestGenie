@@ -328,8 +328,8 @@ class LLMSettingsComponent(private val project: Project) : SettingsComponent {
     private fun createButtonPanel(keyword: PromptKeyword, panel: JPanel): JPanel {
         val buttonPanel = JPanel(FlowLayout(FlowLayout.LEFT))
         val editorTextField = panel.getComponent(1) as EditorTextField
-        val button = JButton("\$${keyword.text}")
-        button.setForeground(JBColor.ORANGE)
+        val button = JButton(keyword.variable)
+        button.foreground = JBColor.ORANGE
         button.font = Font("Monochrome", Font.BOLD, 12)
 
         // add actionListener for button
@@ -340,7 +340,7 @@ class LLMSettingsComponent(private val project: Project) : SettingsComponent {
                 val offset = e.caretModel.offset
                 val document = editorTextField.document
                 WriteCommandAction.runWriteCommandAction(e.project) {
-                    document.insertString(offset, "\$${keyword.text}")
+                    document.insertString(offset, keyword.variable)
                 }
             }
         }

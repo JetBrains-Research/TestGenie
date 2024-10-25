@@ -21,14 +21,14 @@ TestSpark is a plugin for generating unit tests. TestSpark natively integrates d
 
 TestSpark currently supports two test generation strategies:
 <ul>
-        <li>LLM-based test generation (using <a href="https://openai.com">OpenAI</a> and JetBrains internal AI Assistant platform)</li>
+        <li>LLM-based test generation (using <a href="https://openai.com">OpenAI</a>, HuggingFace, and JetBrains internal AI Assistant platform)</li>
         <li>Local search-based test generation (using <a href="https://www.evosuite.org">EvoSuite</a>)</li>
 </ul>
 <h4>LLM-based test generation</h4>
     <p>For this type of test generation, TestSpark sends request to different Large Language Models. Also, it automatically checks if tests are valid before presenting it to users.</p>
-    <p>This feature needs a token from OpenAI platform or the AI Assistant platform.</p>
+    <p>This feature needs a token from OpenAI, HuggingFace, or the AI Assistant platform.</p>
     <ul>
-        <li>Supports Java (any version).</li>
+        <li>Supports Java (any version) and Kotlin (K2 mode should be disabled, checkout the Settings section on README).</li>
         <li>Generates unit tests for capturing failures.</li>
         <li>Generate tests for Java classes, methods, and single lines.</li>
     </ul>
@@ -79,6 +79,7 @@ If you are running the plugin for the first time, checkout the [Settings](#setti
 - [Coverage](#coverage)
 - [Integrating tests into the project](#integrating-tests-into-the-project)
 - [Settings](#settings)
+- [Disable K2 for Kotlin Test Generation](#disable-K2)
 - [Telemetry](#telemetry-opt-in)
 
 ### Generating Tests
@@ -238,7 +239,9 @@ Or to a new file:
 
 ![Tests adding to a new file](readme-images/gifs/AddingToANewFile.gif#gh-light-mode-only)
 ![Tests adding to a new file_dark](readme-images/gifs/AddingToANewFile_dark.gif#gh-dark-mode-only)
-
+### Disable K2
+For LLM-based Kotlin test generation, you need to disable the K2 mode for now.
+![Disable K2 mode](readme-images/pngs/k2-mode/disable-k2.png)
 ### Settings
 <!-- How can users configure the plugin to match their needs? -->
 The plugin is configured mainly through the Settings menu. The plugin settings can be found under <kbd>Settings</kbd> > <kbd>Tools</kbd> > <kbd>TestSpark</kbd>. Here, the user is able to select options for the plugin:

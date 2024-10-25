@@ -82,7 +82,13 @@ fun executeTestCaseModificationRequest(
     errorMonitor: ErrorMonitor = DefaultErrorMonitor(),
 ): TestSuiteGeneratedByLLM? {
     // Update Token information
-    val prompt = "For this test:\n ```\n $testCase\n ```\nPerform the following task: $task"
+    val prompt = buildString {
+        append("For this test:\n ```\n ")
+        append(testCase)
+        append("\n```\nGenerate a SINGLE test method. Do not change class and method names.")
+        append("\nPerform the following task:\n")
+        append(task)
+    }
 
     val packageName = getPackageFromTestSuiteCode(testCase, language)
 

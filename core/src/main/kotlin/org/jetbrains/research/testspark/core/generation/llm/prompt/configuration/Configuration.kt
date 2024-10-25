@@ -43,6 +43,7 @@ data class PromptConfiguration(
 data class ClassRepresentation(
     val qualifiedName: String,
     val fullText: String,
+    val constructorSignatures: List<String>,
     val allMethods: List<MethodRepresentation>,
     val classType: ClassType,
 )

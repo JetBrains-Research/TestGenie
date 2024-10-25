@@ -24,6 +24,8 @@ class IJProgressIndicator(private val indicator: ProgressIndicator) : CustomProg
 
     override fun isCanceled(): Boolean = indicator.isCanceled
 
+    override fun isRunning(): Boolean = indicator.isRunning
+
     override fun start() {
         indicator.start()
     }

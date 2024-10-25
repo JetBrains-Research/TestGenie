@@ -64,6 +64,7 @@ class TestProcessor(
      * @param projectBuildPath The build path of the project.
      * @param generatedTestPackage The package where the generated test class is located.
      * @return An empty string if the test execution is successful, otherwise an error message.
+     * TODO refactor method signature to return exit code as well, see `TestCompiler` for example
      */
     fun createXmlFromJacoco(
         className: String,
@@ -99,7 +100,7 @@ class TestProcessor(
             } else {
                 "-javaagent:$jacocoAgentLibraryPath=destfile=$dataFileName.exec,append=false"
             }
-        val testExecutionError = CommandLineRunner.run(
+        val testExecutionResult = CommandLineRunner.run(
             arrayListOf(
                 javaRunner.absolutePath,
                 javaAgentFlag,
@@ -110,7 +111,7 @@ class TestProcessor(
             ),
         )
 
-        log.info("Test execution error message: $testExecutionError")
+        log.info("Exit code: '${testExecutionResult.exitCode}'; Execution message: '${testExecutionResult.executionMessage}'")
 
         // Prepare the command for generating the Jacoco report
         val command = mutableListOf(
@@ -140,7 +141,7 @@ class TestProcessor(
 
         CommandLineRunner.run(command as ArrayList<String>)
 
-        return testExecutionError
+        return if (testExecutionResult.isSuccessful()) "" else testExecutionResult.executionMessage
     }
 
     /**
@@ -178,9 +179,9 @@ class TestProcessor(
         )
 
         // compilation checking
-        val compilationResult = testCompiler.compileCode(generatedTestPath, buildPath)
-        if (!compilationResult.first) {
-            testsExecutionResultManager.addFailedTest(testId, testCode, compilationResult.second)
+        val compilationResult = testCompiler.compileCode(generatedTestPath, buildPath, resultPath)
+        if (!compilationResult.isSuccessful()) {
+            testsExecutionResultManager.addFailedTest(testId, testCode, compilationResult.executionMessage)
         } else {
             val dataFileName = "$resultPath/jacoco-${fileName.split(".")[0]}"
 

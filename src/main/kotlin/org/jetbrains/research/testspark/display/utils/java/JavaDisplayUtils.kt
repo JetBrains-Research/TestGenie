@@ -30,7 +30,7 @@ import java.util.Locale
 import javax.swing.JOptionPane
 
 class JavaDisplayUtils : DisplayUtils {
-    override fun applyTests(project: Project, uiContext: UIContext?, testCaseComponents: List<String>) {
+    override fun applyTests(project: Project, uiContext: UIContext?, testCaseComponents: List<String>): Boolean {
         // Descriptor for choosing folders and java files
         val descriptor = FileChooserDescriptor(true, true, false, false, false, false)
 
@@ -61,7 +61,7 @@ class JavaDisplayUtils : DisplayUtils {
         /**
          * Cancel button pressed
          */
-        if (fileChooser.isEmpty()) return
+        if (fileChooser.isEmpty()) return false
 
         /**
          * Chosen files by user
@@ -102,7 +102,7 @@ class JavaDisplayUtils : DisplayUtils {
                     )
 
                 // Cancel button pressed
-                jOptionPane ?: return
+                jOptionPane ?: return false
 
                 // Get class name from user
                 className = jOptionPane as String
@@ -158,6 +158,8 @@ class JavaDisplayUtils : DisplayUtils {
             OpenFileDescriptor(project, virtualFile!!),
             true,
         )
+
+        return true
     }
 
     override fun appendTestsToClass(

@@ -10,17 +10,17 @@
 
     <p> TestSpark currently supports two test generation strategies:</p>
     <ul>
-        <li>LLM-based test generation (using <a href="https://openai.com">OpenAI</a> and JetBrains internal AI Assistant platform)</li>
+        <li>LLM-based test generation (using <a href="https://openai.com">OpenAI</a>, HuggingFace, and JetBrains internal AI Assistant platform)</li>
         <li>Local search-based test generation (using <a href="https://www.evosuite.org">EvoSuite</a>)</li>
     </ul>
 
     <h4>LLM-based test generation</h4>
     <p>For this type of test generation, TestSpark sends request to different Large Language Models. Also, it automatically checks if tests are valid before presenting it to users.</p>
-    <p>This feature needs a token from OpenAI platform or the AI Assistant platform.</p>
+    <p>This feature needs a token from OpenAI, HuggingFace, or the AI Assistant platform.</p>
     <ul>
-        <li>Supports Java (any version).</li>
+        <li>Supports Java (any version) and Kotlin (K2 mode should be disabled, checkout the Settings section on README).</li>
         <li>Generates unit tests for capturing failures.</li>
-        <li>Generate tests (JUnit4 and 5) for Java classes, methods, and single lines.</li>
+        <li>Generate tests for Java classes, methods, and single lines.</li>
     </ul>
 
     <h4>Local search-based test generation</h4>
@@ -36,6 +36,14 @@
       ]]></description>
 
     <change-notes><![CDATA[
+        <h4>0.3.0</h4>
+            <ul>
+                <li>Add full LLM-based Kotlin test generation for line, method/function, and class.</li>
+                <li>Integration with HuggingFace.</li>
+                <li>Support IDEA 242.*</li>
+                <li>Fixed multiple bugs in the LLM-based test generation algorithm.</li>
+                <li>Fixed multiple bugs in the UI.</li>
+            </ul>
         <h4>0.2.1</h4>
             <ul>
                 <li>Fix several minor bugs related to JUnit5 support and default template.</li>
@@ -149,7 +157,7 @@
     <depends>com.intellij.gradle</depends>
 
     <!--    Plugin depends on the Kotlin support plugin that comes with org.jetbrains.kotlin.
-            This dependency is optional, which means plugin can run even if the Java plugin is not available or not enabled.
+            This dependency is optional, which means plugin can run even if the Kotlin plugin is not available or not enabled.
             This dependency will be loaded only when actually needed.
             Moreover, we specify the configuration file to consider when the dependency is needed. -->
     <depends

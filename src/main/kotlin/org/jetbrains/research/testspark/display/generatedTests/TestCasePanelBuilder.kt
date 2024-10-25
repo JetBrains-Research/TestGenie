@@ -31,6 +31,7 @@ import com.intellij.ui.LanguageTextField
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.JBUI
 import org.jetbrains.kotlin.psi.psiUtil.endOffset
+import org.jetbrains.research.testspark.bundles.llm.LLMMessagesBundle
 import org.jetbrains.research.testspark.bundles.plugin.PluginLabelsBundle
 import org.jetbrains.research.testspark.bundles.plugin.PluginMessagesBundle
 import org.jetbrains.research.testspark.core.data.Report
@@ -57,6 +58,7 @@ import org.jetbrains.research.testspark.tools.TestProcessor
 import org.jetbrains.research.testspark.tools.TestsExecutionResultManager
 import org.jetbrains.research.testspark.tools.ToolUtils
 import org.jetbrains.research.testspark.tools.factories.TestCompilerFactory
+import org.jetbrains.research.testspark.tools.llm.error.LLMErrorManager
 import org.jetbrains.research.testspark.tools.llm.test.JUnitTestSuitePresenter
 import java.awt.Dimension
 import java.awt.Toolkit
@@ -322,6 +324,11 @@ class TestCasePanelBuilder(
 
         sendButton.addActionListener { sendRequest() }
 
+        /**
+         * The following code is a workaround for the issue with the ComboBox preferred size.
+         * See: https://github.com/JetBrains-Research/TestSpark/pull/343#discussion_r1781430743
+         */
+        requestComboBox.preferredSize = Dimension(0, 0)
         requestComboBox.isEditable = true
 
         return panel
@@ -485,7 +492,8 @@ class TestCasePanelBuilder(
      */
     private fun sendRequest() {
         loadingLabel.isVisible = true
-        enableComponents(false)
+        enableGlobalComponents(false)
+        enableLocalComponents(false)
 
         ProgressManager.getInstance()
             .run(object : Task.Backgroundable(project, PluginMessagesBundle.get("sendingFeedback")) {
@@ -507,7 +515,9 @@ class TestCasePanelBuilder(
                         uiContext.errorMonitor,
                     )
 
-                    if (modifiedTest != null) {
+                    if (modifiedTest == null || modifiedTest.testCases.isEmpty()) {
+                        LLMErrorManager().warningProcess(LLMMessagesBundle.get("modifyWithLLMError"), project)
+                    } else {
                         modifiedTest.setTestFileName(
                             getClassWithTestCaseName(testCase.testName),
                         )
@@ -525,13 +535,19 @@ class TestCasePanelBuilder(
             })
     }
 
-    private fun finishProcess() {
+    private fun finishProcess(enableGlobal: Boolean = true) {
         uiContext!!.errorMonitor.clear()
         loadingLabel.isVisible = false
-        enableComponents(true)
+        if (enableGlobal) enableGlobalComponents(true)
+        enableLocalComponents(true)
     }
 
-    private fun enableComponents(isEnabled: Boolean) {
+    private fun enableGlobalComponents(isEnabled: Boolean) {
+        generatedTestsTabData.topButtonsPanelBuilder.getRemoveAllButton().isEnabled = isEnabled
+        generatedTestsTabData.applyButton.isEnabled = isEnabled
+    }
+
+    private fun enableLocalComponents(isEnabled: Boolean) {
         nextButton.isEnabled = isEnabled
         previousButton.isEnabled = isEnabled
         runTestButton.isEnabled = isEnabled
@@ -580,12 +596,13 @@ class TestCasePanelBuilder(
         if (!runTestButton.isEnabled) return
 
         loadingLabel.isVisible = true
-        enableComponents(false)
+        enableGlobalComponents(false)
+        enableLocalComponents(false)
 
         ProgressManager.getInstance()
             .run(object : Task.Backgroundable(project, PluginMessagesBundle.get("sendingFeedback")) {
                 override fun run(indicator: ProgressIndicator) {
-                    runTest(IJProgressIndicator(indicator))
+                    runTest(IJProgressIndicator(indicator), true)
                 }
             })
     }
@@ -595,14 +612,20 @@ class TestCasePanelBuilder(
         if (!runTestButton.isEnabled) return
 
         loadingLabel.isVisible = true
-        enableComponents(false)
+        enableGlobalComponents(false)
+        enableLocalComponents(false)
 
         tasks.add { indicator ->
-            runTest(indicator)
+            runTest(indicator, false)
         }
     }
 
-    private fun runTest(indicator: CustomProgressIndicator) {
+    fun removeTask() {
+        finishProcess()
+        update()
+    }
+
+    private fun runTest(indicator: CustomProgressIndicator, enableGlobal: Boolean) {
         indicator.setText("Executing ${testCase.testName}")
 
         val fileName = TestAnalyzerFactory.create(language).getFileNameFromTestCaseCode(testCase.testCode)
@@ -636,7 +659,7 @@ class TestCasePanelBuilder(
             update()
         }
 
-        finishProcess()
+        finishProcess(enableGlobal)
         indicator.stop()
     }
 

@@ -127,11 +127,14 @@ object ToolUtils {
      * @return true if the process has been stopped, false otherwise
      */
     fun isProcessStopped(errorMonitor: ErrorMonitor, indicator: CustomProgressIndicator): Boolean {
-        return errorMonitor.hasErrorOccurred() || isProcessCanceled(indicator)
+        return errorMonitor.hasErrorOccurred() || isProcessCanceled(errorMonitor, indicator)
     }
 
-    fun isProcessCanceled(indicator: CustomProgressIndicator): Boolean {
+    fun isProcessCanceled(errorMonitor: ErrorMonitor, indicator: CustomProgressIndicator): Boolean {
         if (indicator.isCanceled()) {
+            errorMonitor.notifyErrorOccurrence()
+            // TODO: we must not stop this indicator! cancellation MAY already imply stoppage
+            //       See: https://github.com/JetBrains-Research/TestSpark/issues/375
             indicator.stop()
             return true
         }

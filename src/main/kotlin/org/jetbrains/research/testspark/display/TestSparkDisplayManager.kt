@@ -4,6 +4,7 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowManager
+import com.intellij.serviceContainer.AlreadyDisposedException
 import com.intellij.ui.content.ContentManager
 import org.jetbrains.research.testspark.bundles.plugin.PluginLabelsBundle
 import org.jetbrains.research.testspark.bundles.plugin.PluginMessagesBundle
@@ -75,6 +76,10 @@ class TestSparkDisplayManager {
                 clear()
             }
         }
+
+        generatedTestsTabBuilder!!.getApplyButton().addActionListener {
+            if (generatedTestsTabBuilder!!.applyTests()) clear()
+        }
     }
 
     fun clear() {
@@ -90,7 +95,8 @@ class TestSparkDisplayManager {
                 }
             }
         }
-
-        toolWindow?.hide()
+        try {
+            toolWindow?.hide()
+        } catch (_: AlreadyDisposedException) {} // Make sure the process continues if the tool window is already closed
     }
 }

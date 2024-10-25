@@ -13,8 +13,6 @@ import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.ex.ApplicationManagerEx
 import com.intellij.openapi.progress.util.ProgressIndicatorBase
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.project.ex.ProjectManagerEx
-import com.intellij.openapi.startup.StartupManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -27,7 +25,6 @@ import org.jetbrains.plugins.gradle.GradleCommandLineProjectConfigurator
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import java.util.function.Predicate
-import kotlin.coroutines.resume
 import kotlin.coroutines.suspendCoroutine
 
 class ProjectConfiguratorException : Exception {
@@ -162,15 +159,16 @@ object ProjectApplicationUtils {
     private fun closeProject(project: Project) {
         logger.info("Closing project $project...")
         ApplicationManager.getApplication().assertIsNonDispatchThread()
-
-        ApplicationManager.getApplication().invokeAndWait {
-            ProjectManagerEx.getInstanceEx().forceCloseProject(project)
-        }
+        // ToDo: move headless mode to another branch
+//        ApplicationManager.getApplication().invokeAndWait {
+//            ProjectManagerEx.getInstanceEx().forceCloseProject(project)
+//        }
     }
 
     private suspend fun waitAllStartupActivitiesPassed(project: Project): Unit = suspendCoroutine {
         logger.info("Waiting all startup activities passed $project...")
-        StartupManager.getInstance(project).runAfterOpened { it.resume(Unit) }
+        // ToDo: move headless mode to another branch
+//        StartupManager.getInstance(project).runAfterOpened { it.resume(Unit) }
         waitForInvokeLaterActivities()
     }
 

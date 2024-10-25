@@ -8,13 +8,14 @@ import com.intellij.openapi.project.Project
 import org.jetbrains.research.testspark.bundles.plugin.PluginMessagesBundle
 import org.jetbrains.research.testspark.core.monitor.DefaultErrorMonitor
 import org.jetbrains.research.testspark.core.monitor.ErrorMonitor
+import org.jetbrains.research.testspark.core.progress.CustomProgressIndicator
 
 /**
  * Manager used for monitoring the unit test generation process.
  * It also limits TestSpark to generate tests only once at a time.
  */
 class TestGenerationController {
-    private var isRunning: Boolean = false
+    var indicator: CustomProgressIndicator? = null
 
     // errorMonitor is passed in many places in the project
     // and reflects if any bug happened in the test generation process
@@ -26,6 +27,7 @@ class TestGenerationController {
     private fun showGenerationRunningNotification(project: Project) {
         val terminateButton: AnAction = object : AnAction("Terminate") {
             override fun actionPerformed(e: AnActionEvent) {
+                indicator?.stop()
                 errorMonitor.notifyErrorOccurrence()
             }
         }
@@ -44,7 +46,11 @@ class TestGenerationController {
     }
 
     fun finished() {
-        isRunning = false
+        if (indicator != null &&
+            indicator!!.isRunning()
+        ) {
+            indicator?.stop()
+        }
     }
 
     /**
@@ -53,11 +59,15 @@ class TestGenerationController {
      * @return true if it is already running
      */
     fun isGeneratorRunning(project: Project): Boolean {
-        if (isRunning) {
+        // If indicator is null, we have never initiated an indicator before and there is no running test generation
+        if (indicator == null) {
+            return false
+        }
+
+        if (indicator!!.isRunning()) {
             showGenerationRunningNotification(project)
             return true
         }
-        isRunning = true
         return false
     }
 }

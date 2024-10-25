@@ -21,26 +21,9 @@ class JsonEncoding {
         /**
          * Encode a list of strings into a string
          */
-        fun encode(values: MutableList<String>): String {
-            var jsonString = Json.encodeToString(
-                ListSerializer(String.serializer()),
-                values,
-            )
-            // These characters are incorrectly stored in json, so the following substitutions are required
-            val replacements = mapOf(
-                "\\n" to "\n",
-                "\\t" to "\t",
-                "\\r" to "\r",
-                "\\\\" to "\\",
-                "\\\"" to "\"",
-                "\\'" to "\'",
-                "\\b" to "\b",
-                "\\f" to "\u000c",
-            )
-            replacements.forEach { (key, value) ->
-                jsonString = jsonString.replace(key, value)
-            }
-            return jsonString
-        }
+        fun encode(values: MutableList<String>): String = Json.encodeToString(
+            ListSerializer(String.serializer()),
+            values,
+        )
     }
 }

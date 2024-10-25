@@ -13,7 +13,7 @@ typealias CodeTypeDisplayName = Pair<CodeType, String>
 
 /**
  * Interface representing a wrapper for PSI methods,
- * providing common API to handle method-related data for different languages.
+ * providing a common API to handle method-related data for different languages.
  *
  * @property name The name of a method
  * @property methodDescriptor Human-readable method signature
@@ -43,13 +43,14 @@ interface PsiMethodWrapper {
 
 /**
  * Interface representing a wrapper for PSI classes,
- * providing common API to handle class-related data for different languages.
+ * providing a common API to handle class-related data for different languages.
  * @property name The name of a class
  * @property qualifiedName The qualified name of the class.
  * @property text The text of the class.
  * @property methods All methods in the class
  * @property allMethods All methods in the class and all its superclasses
- * @property superClass The super class of the class
+ * @property constructorSignatures The signatures of all constructors in the class
+ * @property superClass The superclass of the class
  * @property virtualFile Virtual file where the class is located
  * @property containingFile File where the method is located
  * @property fullText The source code of the class (with package and imports).
@@ -62,6 +63,7 @@ interface PsiClassWrapper {
     val text: String?
     val methods: List<PsiMethodWrapper>
     val allMethods: List<PsiMethodWrapper>
+    val constructorSignatures: List<String>
     val superClass: PsiClassWrapper?
     val virtualFile: VirtualFile
     val containingFile: PsiFile
@@ -94,12 +96,20 @@ interface PsiHelper {
     val language: SupportedLanguage
 
     /**
+     * Checks if a code construct is valid for unit test generation at the given caret offset.
+     *
+     * @param e The AnActionEvent representing the current action event.
+     * @return `true` if a code construct is valid for unit test generation at the caret offset, `false` otherwise.
+     */
+    fun availableForGeneration(e: AnActionEvent): Boolean
+
+    /**
      * Returns the surrounding PsiClass object based on the caret position within the specified PsiFile.
      * The surrounding class is determined by finding the PsiClass objects within the PsiFile and checking
      * if the caret is within any of them.
      *
      * @param caretOffset The offset of the caret position within the PsiFile.
-     * @return The surrounding PsiClass object if found, null otherwise.
+     * @return The surrounding `PsiClass` object if found, `null` otherwise.
      */
     fun getSurroundingClass(caretOffset: Int): PsiClassWrapper?
 
@@ -113,6 +123,8 @@ interface PsiHelper {
 
     /**
      * Returns the line number of the selected line where the caret is positioned.
+     *
+     * The returned line number is **1-based**.
      *
      * @param caretOffset The caret offset within the PSI file.
      * @return The line number of the selected line, otherwise null.

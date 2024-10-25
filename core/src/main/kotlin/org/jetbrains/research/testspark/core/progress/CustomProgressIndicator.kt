@@ -11,4 +11,5 @@ interface CustomProgressIndicator {
     fun isCanceled(): Boolean
     fun start()
     fun stop()
+    fun isRunning(): Boolean
 }

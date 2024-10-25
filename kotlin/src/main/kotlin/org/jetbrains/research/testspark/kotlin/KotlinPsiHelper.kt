@@ -25,6 +25,20 @@ class KotlinPsiHelper(private val psiFile: PsiFile) : PsiHelper {
 
     override val language: SupportedLanguage get() = SupportedLanguage.Kotlin
 
+    /**
+     * When dealing with Kotlin PSI files, we expect that only classes, their methods,
+     * top-level functions are tested.
+     * Therefore, we expect either a class or a method (top-level function) to surround a cursor offset.
+     *
+     * This requirement ensures that the user is not trying
+     * to generate tests for a line of code outside the aforementioned scopes.
+     *
+     * @param e `AnActionEvent` representing the current action event.
+     * @return `true` if the cursor is inside a class or method, `false` otherwise.
+     */
+    override fun availableForGeneration(e: AnActionEvent): Boolean =
+        getCurrentListOfCodeTypes(e).any { (it.first == CodeType.CLASS) || (it.first == CodeType.METHOD) }
+
     private val log = Logger.getInstance(this::class.java)
 
     override fun generateMethodDescriptor(psiMethod: PsiMethodWrapper): String {
@@ -64,6 +78,12 @@ class KotlinPsiHelper(private val psiFile: PsiFile) : PsiHelper {
     override fun getSurroundingLineNumber(caretOffset: Int): Int? {
         val doc = PsiDocumentManager.getInstance(psiFile.project).getDocument(psiFile) ?: return null
 
+        /**
+         * See `getLineNumber`'s documentation for details on the numbering.
+         * It returns an index of the line in the document, starting from 0.
+         *
+         * Therefore, we need to increase the result by one to get the line number.
+         */
         val selectedLine = doc.getLineNumber(caretOffset)
         val selectedLineText =
             doc.getText(TextRange(doc.getLineStartOffset(selectedLine), doc.getLineEndOffset(selectedLine)))
@@ -73,7 +93,7 @@ class KotlinPsiHelper(private val psiFile: PsiFile) : PsiHelper {
             return null
         }
         log.info("Surrounding line at caret $caretOffset is $selectedLine")
-        return selectedLine
+        return selectedLine + 1
     }
 
     override fun collectClassesToTest(
@@ -150,7 +170,7 @@ class KotlinPsiHelper(private val psiFile: PsiFile) : PsiHelper {
 
         val ktClass = getSurroundingClass(caret.offset)
         val ktFunction = getSurroundingMethod(caret.offset)
-        val line: Int? = getSurroundingLineNumber(caret.offset)?.plus(1)
+        val line: Int? = getSurroundingLineNumber(caret.offset)
 
         ktClass?.let { result.add(CodeType.CLASS to getClassHTMLDisplayName(it)) }
         ktFunction?.let { result.add(CodeType.METHOD to getMethodHTMLDisplayName(it)) }

@@ -1,6 +1,7 @@
 package org.jetbrains.research.testspark.core.utils
 
 import io.github.oshai.kotlinlogging.KotlinLogging
+import org.jetbrains.research.testspark.core.test.ExecutionResult
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
@@ -9,16 +10,16 @@ class CommandLineRunner {
         protected val log = KotlinLogging.logger {}
 
         /**
-         * Executes a command line process and returns the output as a string.
+         * Executes a command line process
          *
          * @param cmd The command line arguments as an ArrayList of strings.
-         * @return The output of the command line process as a string.
+         * @return A pair containing exit code and a string message containing stdout and stderr of the executed process.
          */
-        fun run(cmd: ArrayList<String>): String {
-            var errorMessage = ""
+        fun run(cmd: ArrayList<String>): ExecutionResult {
+            var executionMsg = ""
 
             /**
-             * Since Windows does not provide bash, use cmd or similar default command line interpreter
+             * Since Windows does not provide bash, use cmd or simila       r default command line interpreter
              */
             val process = if (DataFilesUtil.isWindows()) {
                 ProcessBuilder()
@@ -32,17 +33,16 @@ class CommandLineRunner {
                     .redirectErrorStream(true)
                     .start()
             }
-
             val reader = BufferedReader(InputStreamReader(process.inputStream))
+            val separator = System.lineSeparator()
             var line: String?
 
             while (reader.readLine().also { line = it } != null) {
-                errorMessage += line
+                executionMsg += "$line$separator"
             }
 
             process.waitFor()
-
-            return errorMessage
+            return ExecutionResult(process.exitValue(), executionMsg)
         }
     }
 }

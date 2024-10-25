@@ -23,6 +23,8 @@ class HeadlessProgressIndicator : CustomProgressIndicator {
 
     override fun isCanceled(): Boolean = false
 
+    override fun isRunning(): Boolean = true
+
     override fun start() {}
 
     override fun stop() {}
