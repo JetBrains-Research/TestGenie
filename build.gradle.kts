@@ -239,7 +239,7 @@ intellijPlatform {
         }
         freeArgs = listOf(
             "-mute",
-            "TemplateWordInPluginId,ForbiddenPluginIdPrefix"
+            "TemplateWordInPluginId,ForbiddenPluginIdPrefix",
         )
     }
 }
