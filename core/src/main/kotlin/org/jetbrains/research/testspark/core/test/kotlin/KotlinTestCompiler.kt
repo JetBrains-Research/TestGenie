@@ -56,12 +56,15 @@ class KotlinTestCompiler(
 
         val classPaths = "\"${getClassPaths(projectBuildPath)}\""
         // Compile file
+        // See: https://github.com/JetBrains-Research/TestSpark/issues/402
+        val kotlinc = if (DataFilesUtil.isWindows()) "\"$kotlinc\"" else "'$kotlinc'"
+
         val executionResult = CommandLineRunner.run(
             arrayListOf(
                 /**
                  * Filepath may contain spaces, so we need to wrap it in quotes.
                  */
-                "'$kotlinc'",
+                kotlinc,
                 "-cp",
                 classPaths,
                 path,
