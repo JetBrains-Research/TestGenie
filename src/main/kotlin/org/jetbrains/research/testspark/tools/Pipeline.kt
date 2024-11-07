@@ -34,6 +34,7 @@ import java.util.UUID
  * @param caretOffset the offset of the caret position in the PSI file.
  * @param fileUrl the URL of the file being processed, if applicable.
  * @param packageName the package name of the file being processed.
+ * @param generationToolName the tool name chosen for generation
  */
 class Pipeline(
     private val project: Project,
@@ -44,9 +45,11 @@ class Pipeline(
     private val testGenerationController: TestGenerationController,
     private val testSparkDisplayManager: TestSparkDisplayManager,
     private val testsExecutionResultManager: TestsExecutionResultManager,
+    generationToolName: String,
 ) {
     val projectContext: ProjectContext = ProjectContext()
     val generatedTestsData = TestGenerationData()
+    val generationTool = GenerationTool.from(generationToolName)
 
     init {
         val cutPsiClass = psiHelper.getSurroundingClass(caretOffset)
@@ -134,6 +137,7 @@ class Pipeline(
                             psiHelper.language,
                             project,
                             testsExecutionResultManager,
+                            generationTool,
                         )
                     }
                 }
@@ -141,14 +145,15 @@ class Pipeline(
                 private fun updateEditor(fileUrl: String) {
                     val documentManager = FileDocumentManager.getInstance()
                     // https://intellij-support.jetbrains.com/hc/en-us/community/posts/360004480599/comments/360000703299
-                    FileEditorManager.getInstance(project).selectedEditors.map { it as TextEditor }.map { it.editor }.map {
-                        val currentFile = documentManager.getFile(it.document)
-                        if (currentFile != null) {
-                            if (currentFile.presentableUrl == fileUrl) {
-                                editor = it
+                    FileEditorManager.getInstance(project).selectedEditors.map { it as TextEditor }.map { it.editor }
+                        .map {
+                            val currentFile = documentManager.getFile(it.document)
+                            if (currentFile != null) {
+                                if (currentFile.presentableUrl == fileUrl) {
+                                    editor = it
+                                }
                             }
                         }
-                    }
                 }
             })
     }

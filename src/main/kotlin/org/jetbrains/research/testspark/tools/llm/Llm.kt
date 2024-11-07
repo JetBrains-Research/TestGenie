@@ -218,6 +218,7 @@ class Llm(override val name: String = "LLM") : Tool {
                 testGenerationController,
                 testSparkDisplayManager,
                 testsExecutionResultManager,
+                name,
             )
 
             val manager = LLMProcessManager(

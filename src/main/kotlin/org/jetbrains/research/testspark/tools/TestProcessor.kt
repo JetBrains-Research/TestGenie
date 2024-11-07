@@ -7,15 +7,14 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.CompilerModuleExtension
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.roots.ProjectRootManager
+import org.jetbrains.research.testspark.core.data.JUnitVersion
 import org.jetbrains.research.testspark.core.data.TestCase
 import org.jetbrains.research.testspark.core.test.TestCompiler
 import org.jetbrains.research.testspark.core.test.TestsPersistentStorage
 import org.jetbrains.research.testspark.core.utils.CommandLineRunner
 import org.jetbrains.research.testspark.core.utils.DataFilesUtil
 import org.jetbrains.research.testspark.data.ProjectContext
-import org.jetbrains.research.testspark.services.LLMSettingsService
 import org.jetbrains.research.testspark.services.PluginSettingsService
-import org.jetbrains.research.testspark.settings.llm.LLMSettingsState
 import java.io.File
 import java.nio.file.Path
 import kotlin.io.path.Path
@@ -29,9 +28,6 @@ class TestProcessor(
         givenProjectSDKPath?.toString() ?: ProjectRootManager.getInstance(project).projectSdk!!.homeDirectory!!.path
 
     private val log = Logger.getInstance(this::class.java)
-
-    private val llmSettingsState: LLMSettingsState
-        get() = project.getService(LLMSettingsService::class.java).state
 
     override fun saveGeneratedTest(
         packageString: String,
@@ -75,6 +71,7 @@ class TestProcessor(
         resultPath: String,
         projectContext: ProjectContext,
         testCompiler: TestCompiler,
+        junitVersion: JUnitVersion,
     ): String {
         // find the proper javac
         val javaRunner = findJavaCompilerInDirectory(homeDirectory)
@@ -87,8 +84,6 @@ class TestProcessor(
         // unique name
         var name = if (generatedTestPackage.isEmpty()) "" else "$generatedTestPackage."
         name += "$className#$testCaseName"
-
-        val junitVersion = llmSettingsState.junitVersion.version
 
         // run the test method with jacoco agent
         log.info("[TestProcessor] Executing $name")
@@ -106,7 +101,7 @@ class TestProcessor(
                 javaAgentFlag,
                 "-cp",
                 "\"${testCompiler.getClassPaths(projectBuildPath)}${DataFilesUtil.classpathSeparator}${junitRunnerLibraryPath}${DataFilesUtil.classpathSeparator}$resultPath\"",
-                "org.jetbrains.research.SingleJUnitTestRunner$junitVersion",
+                "org.jetbrains.research.SingleJUnitTestRunner${junitVersion.version}",
                 name,
             ),
         )
@@ -162,6 +157,7 @@ class TestProcessor(
         projectContext: ProjectContext,
         testCompiler: TestCompiler,
         testsExecutionResultManager: TestsExecutionResultManager,
+        junitVersion: JUnitVersion,
     ): TestCase {
         // get buildPath
         var buildPath: String = ProjectRootManager.getInstance(project).contentRoots.first().path
@@ -194,6 +190,7 @@ class TestProcessor(
                 resultPath,
                 projectContext,
                 testCompiler,
+                junitVersion,
             )
 
             if (!File("$dataFileName.xml").exists()) {

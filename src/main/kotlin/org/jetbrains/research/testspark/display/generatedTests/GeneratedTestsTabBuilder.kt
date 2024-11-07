@@ -15,6 +15,7 @@ import org.jetbrains.research.testspark.display.utils.ReportUpdater
 import org.jetbrains.research.testspark.display.utils.java.JavaDisplayUtils
 import org.jetbrains.research.testspark.display.utils.kotlin.KotlinDisplayUtils
 import org.jetbrains.research.testspark.display.utils.template.DisplayUtils
+import org.jetbrains.research.testspark.tools.GenerationTool
 import org.jetbrains.research.testspark.tools.TestsExecutionResultManager
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -36,6 +37,7 @@ class GeneratedTestsTabBuilder(
     private val uiContext: UIContext,
     private val coverageVisualisationTabBuilder: CoverageVisualisationTabBuilder,
     private val testsExecutionResultManager: TestsExecutionResultManager,
+    private val generationTool: GenerationTool,
 ) {
     private val generatedTestsTabData: GeneratedTestsTabData = GeneratedTestsTabData()
 
@@ -149,8 +151,17 @@ class GeneratedTestsTabBuilder(
 
             val testCasePanelBuilder =
                 TestCasePanelBuilder(
-                    project, language, testCase, editor, checkbox, uiContext, report,
-                    coverageVisualisationTabBuilder, generatedTestsTabData, testsExecutionResultManager,
+                    project,
+                    language,
+                    testCase,
+                    editor,
+                    checkbox,
+                    uiContext,
+                    report,
+                    coverageVisualisationTabBuilder,
+                    generatedTestsTabData,
+                    testsExecutionResultManager,
+                    generationTool,
                 )
             testCasePanel.add(testCasePanelBuilder.getUpperPanel(), BorderLayout.NORTH)
             testCasePanel.add(testCasePanelBuilder.getMiddlePanel(), BorderLayout.CENTER)
@@ -238,7 +249,8 @@ class GeneratedTestsTabBuilder(
             generatedTestsTabData.contentManager?.removeContent(generatedTestsTabData.content!!, true)
             ToolWindowManager.getInstance(project).getToolWindow("TestSpark")?.hide()
             coverageVisualisationTabBuilder.closeToolWindowTab()
-        } catch (_: AlreadyDisposedException) {} // Make sure the process continues if the tool window is already closed
+        } catch (_: AlreadyDisposedException) {
+        } // Make sure the process continues if the tool window is already closed
     }
 
     /**
