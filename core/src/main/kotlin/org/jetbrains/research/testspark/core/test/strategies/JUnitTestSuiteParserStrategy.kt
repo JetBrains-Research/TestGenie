@@ -2,11 +2,14 @@ package org.jetbrains.research.testspark.core.test.strategies
 
 import org.jetbrains.research.testspark.core.data.JUnitVersion
 import org.jetbrains.research.testspark.core.test.TestBodyPrinter
-import org.jetbrains.research.testspark.core.test.TestCaseParseResult
+import org.jetbrains.research.testspark.core.test.OperationResult
+import org.jetbrains.research.testspark.core.test.ErrorDetails
 import org.jetbrains.research.testspark.core.test.data.TestCaseGeneratedByLLM
 import org.jetbrains.research.testspark.core.test.data.TestLine
 import org.jetbrains.research.testspark.core.test.data.TestLineType
 import org.jetbrains.research.testspark.core.test.data.TestSuiteGeneratedByLLM
+
+typealias TestCaseParseResult = OperationResult<TestCaseGeneratedByLLM>
 
 class JUnitTestSuiteParserStrategy {
     companion object {
@@ -54,12 +57,12 @@ class JUnitTestSuiteParserStrategy {
                     val result: TestCaseParseResult =
                         testCaseParser.parse(rawTest, isLastTestCaseInTestSuite, testNamePattern, printTestBodyStrategy)
 
-                    if (result.errorOccurred) {
-                        println("WARNING: ${result.errorMessage}")
+                    if (result.error != null) {
+                        println("WARNING: ${result.error}")
                         return@ca
                     }
 
-                    val currentTest = result.testCase!!
+                    val currentTest = result.content!!
 
                     // TODO: make logging work
                     // log.info("New test case: $currentTest")
@@ -104,9 +107,7 @@ class JUnitTestSuiteParserStrategy {
              */
             if (!rawTest.contains(testNamePattern)) {
                 return TestCaseParseResult(
-                    testCase = null,
-                    errorMessage = "The raw Test does not contain $testNamePattern:\n $rawTest",
-                    errorOccurred = true,
+                    error = ErrorDetails("The raw Test does not contain $testNamePattern:\n $rawTest")
                 )
             }
 
@@ -182,11 +183,7 @@ class JUnitTestSuiteParserStrategy {
                 printTestBodyStrategy = printTestBodyStrategy,
             )
 
-            return TestCaseParseResult(
-                testCase = currentTest,
-                errorMessage = "",
-                errorOccurred = false,
-            )
+            return TestCaseParseResult(content = currentTest)
         }
     }
 }
