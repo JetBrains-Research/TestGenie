@@ -1,9 +1,9 @@
 package org.jetbrains.research.testspark.core.test.strategies
 
 import org.jetbrains.research.testspark.core.data.JUnitVersion
-import org.jetbrains.research.testspark.core.test.TestBodyPrinter
-import org.jetbrains.research.testspark.core.test.OperationResult
 import org.jetbrains.research.testspark.core.test.ErrorDetails
+import org.jetbrains.research.testspark.core.test.OperationResult
+import org.jetbrains.research.testspark.core.test.TestBodyPrinter
 import org.jetbrains.research.testspark.core.test.data.TestCaseGeneratedByLLM
 import org.jetbrains.research.testspark.core.test.data.TestLine
 import org.jetbrains.research.testspark.core.test.data.TestLineType
@@ -106,9 +106,7 @@ class JUnitTestSuiteParserStrategy {
                 Tests do not return anything so it is safe to consider that void always appears before test case name
              */
             if (!rawTest.contains(testNamePattern)) {
-                return TestCaseParseResult(
-                    error = ErrorDetails("The raw Test does not contain $testNamePattern:\n $rawTest")
-                )
+                return TestCaseParseResult(error = ErrorDetails("The raw Test does not contain $testNamePattern:\n $rawTest"))
             }
 
             /**
