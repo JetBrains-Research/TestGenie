@@ -42,13 +42,14 @@ class TestProcessor(
         }
         Path(generatedTestPath).createDirectories()
 
+        val testFilePath = "$generatedTestPath${sanitizeFileName(testFileName)}"
         // Save the generated test suite to the file
-        val testFile = File("$generatedTestPath$testFileName")
+        val testFile = File(testFilePath)
         testFile.createNewFile()
         log.info("Save test in file " + testFile.absolutePath)
         testFile.writeText(code)
 
-        return "$generatedTestPath$testFileName"
+        return testFilePath
     }
 
     /**
@@ -285,7 +286,8 @@ class TestProcessor(
                     }
                     children("sourcefile") {
                         isCorrectSourceFile =
-                            this.attributes.getValue("name") == projectContext.fileUrlAsString!!.split(File.separatorChar).last()
+                            this.attributes.getValue("name") == projectContext.fileUrlAsString!!.split(File.separatorChar)
+                                .last()
                         children("line") {
                             if (isCorrectSourceFile && this.attributes.getValue("mi") == "0") {
                                 setOfLines.add(this.attributes.getValue("nr").toInt())
@@ -319,5 +321,16 @@ class TestProcessor(
                 isJavaName && it.isFile
             }
             .first()
+    }
+
+    /**
+     * Remove all forbidden characters depending on platform.
+     */
+    private fun sanitizeFileName(name: String): String {
+        if (DataFilesUtil.isWindows()) {
+            val forbiddenChars = arrayOf("<", ">", ":", "\"", "/", "\\", "|", "?", "*")
+            return forbiddenChars.fold(name) { acc, c -> acc.replace(c, "_") }
+        }
+        return name
     }
 }
