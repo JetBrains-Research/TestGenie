@@ -1,27 +1,24 @@
 package org.jetbrains.research.testspark.tools.llm.generation.grazie
 
 import com.intellij.openapi.project.Project
-import org.jetbrains.research.testspark.bundles.llm.LLMMessagesBundle
 import org.jetbrains.research.testspark.core.data.ChatMessage
+import org.jetbrains.research.testspark.core.error.LlmError
+import org.jetbrains.research.testspark.core.error.TestSparkError
+import org.jetbrains.research.testspark.core.error.TestSparkResult
 import org.jetbrains.research.testspark.core.monitor.ErrorMonitor
 import org.jetbrains.research.testspark.core.progress.CustomProgressIndicator
 import org.jetbrains.research.testspark.core.test.TestsAssembler
 import org.jetbrains.research.testspark.tools.llm.LlmSettingsArguments
-import org.jetbrains.research.testspark.tools.llm.error.LLMErrorManager
 import org.jetbrains.research.testspark.tools.llm.generation.IJRequestManager
 
 class GrazieRequestManager(project: Project) : IJRequestManager(project) {
-    private val llmErrorManager = LLMErrorManager()
-
     override fun send(
         prompt: String,
         indicator: CustomProgressIndicator,
         testsAssembler: TestsAssembler,
         errorMonitor: ErrorMonitor,
-    ): SendResult {
-        var sendResult = SendResult.OK
-
-        try {
+    ): TestSparkResult<Unit, TestSparkError> {
+        return try {
             val className = "org.jetbrains.research.grazie.Request"
             val request: GrazieRequest = Class.forName(className).getDeclaredConstructor().newInstance() as GrazieRequest
 
@@ -30,35 +27,25 @@ class GrazieRequestManager(project: Project) : IJRequestManager(project) {
             if (requestError.isNotEmpty()) {
                 with(requestError) {
                     when {
-                        contains("invalid: 401") -> {
-                            llmErrorManager.errorProcess(
-                                LLMMessagesBundle.get("wrongToken"),
-                                project,
-                                errorMonitor = errorMonitor,
-                            )
-                            sendResult = SendResult.OTHER
-                        }
+                        contains("invalid: 401") -> TestSparkResult.Failure(
+                            error = LlmError.HttpUnauthorized()
+                        )
 
-                        contains("invalid: 413 Payload Too Large") -> {
-                            llmErrorManager.warningProcess(
-                                LLMMessagesBundle.get("tooLongPrompt"),
-                                project,
-                            )
-                            sendResult = SendResult.PROMPT_TOO_LONG
-                        }
+                        contains("invalid: 413 Payload Too Large") -> TestSparkResult.Failure(
+                            error = LlmError.PromptTooLong()
+                        )
 
-                        else -> {
-                            llmErrorManager.errorProcess(requestError, project, errorMonitor)
-                            sendResult = SendResult.OTHER
-                        }
+                        else -> TestSparkResult.Failure(
+                            error = LlmError.GrazieHttpError(requestError)
+                        )
                     }
                 }
+            } else {
+                TestSparkResult.Success(data = Unit)
             }
-        } catch (e: ClassNotFoundException) {
-            llmErrorManager.errorProcess(LLMMessagesBundle.get("grazieError"), project, errorMonitor)
+        } catch (_: ClassNotFoundException) {
+            TestSparkResult.Failure(error = LlmError.GrazieNotAvailable())
         }
-
-        return sendResult
     }
 
     private fun getMessages(): List<Pair<String, String>> {

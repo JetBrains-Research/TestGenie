@@ -6,8 +6,10 @@ import com.intellij.openapi.project.Project
 import com.intellij.util.io.HttpRequests
 import com.intellij.util.io.HttpRequests.HttpStatusException
 import org.jetbrains.research.testspark.bundles.llm.LLMDefaultsBundle
-import org.jetbrains.research.testspark.bundles.llm.LLMMessagesBundle
 import org.jetbrains.research.testspark.core.data.ChatUserMessage
+import org.jetbrains.research.testspark.core.error.LlmError
+import org.jetbrains.research.testspark.core.error.TestSparkError
+import org.jetbrains.research.testspark.core.error.TestSparkResult
 import org.jetbrains.research.testspark.core.monitor.ErrorMonitor
 import org.jetbrains.research.testspark.core.progress.CustomProgressIndicator
 import org.jetbrains.research.testspark.core.test.TestsAssembler
@@ -33,7 +35,7 @@ class HuggingFaceRequestManager(project: Project) : IJRequestManager(project) {
         indicator: CustomProgressIndicator,
         testsAssembler: TestsAssembler,
         errorMonitor: ErrorMonitor,
-    ): SendResult {
+    ): TestSparkResult<Unit, TestSparkError> {
         val httpRequest = HttpRequests.post(
             url + LlmSettingsArguments(project).getModel(),
             "application/json",
@@ -51,8 +53,7 @@ class HuggingFaceRequestManager(project: Project) : IJRequestManager(project) {
         }
 
         val llmRequestBody = HuggingFaceRequestBody(chatHistory, Parameters(topProbability, temperature)).toMap()
-        var sendResult = SendResult.OK
-        try {
+        return try {
             httpRequest.connect {
                 it.write(GsonBuilder().disableHtmlEscaping().create().toJson(llmRequestBody))
                 when (val responseCode = (it.connection as HttpURLConnection).responseCode) {
@@ -63,31 +64,25 @@ class HuggingFaceRequestManager(project: Project) : IJRequestManager(project) {
                                 .asJsonObject["generated_text"].asString.trim(),
                         )
                         testsAssembler.consume(generatedTestCases)
+                        TestSparkResult.Success(data = Unit)
                     }
 
-                    HttpURLConnection.HTTP_INTERNAL_ERROR -> {
-                        llmErrorManager.errorProcess(
-                            LLMMessagesBundle.get("serverProblems"),
-                            project,
-                            errorMonitor,
-                        )
-                        sendResult = SendResult.OTHER
-                    }
+                    HttpURLConnection.HTTP_INTERNAL_ERROR -> TestSparkResult.Failure(
+                        error = LlmError.HttpInternalError()
+                    )
 
-                    HttpURLConnection.HTTP_BAD_REQUEST -> {
-                        llmErrorManager.errorProcess(
-                            LLMMessagesBundle.get("hfServerError"),
-                            project,
-                            errorMonitor,
-                        )
-                        sendResult = SendResult.OTHER
-                    }
+                    HttpURLConnection.HTTP_BAD_REQUEST -> TestSparkResult.Failure(
+                        error = LlmError.HttpError(httpCode = responseCode)
+                    )
+
+                    else -> TestSparkResult.Failure(
+                        error = LlmError.HttpError(httpCode = responseCode)
+                    )
                 }
             }
         } catch (e: HttpStatusException) {
-            log.error { "Error in sending request: ${e.message}" }
+            TestSparkResult.Failure(LlmError.HttpStatusError(e))
         }
-        return sendResult
     }
 
     /**

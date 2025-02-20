@@ -102,5 +102,5 @@ fun executeTestCaseModificationRequest(
         errorMonitor,
     )
 
-    return response.testSuite
+    return response.getDataOrNull()
 }

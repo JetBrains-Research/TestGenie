@@ -24,7 +24,7 @@ import org.jetbrains.research.testspark.display.custom.IJProgressIndicator
 import org.jetbrains.research.testspark.langwrappers.PsiHelper
 import org.jetbrains.research.testspark.tools.llm.error.LLMErrorManager
 import org.jetbrains.research.testspark.tools.template.generation.ProcessManager
-import java.util.UUID
+import java.util.*
 
 /**
  * Pipeline class represents a pipeline for generating tests in a project.

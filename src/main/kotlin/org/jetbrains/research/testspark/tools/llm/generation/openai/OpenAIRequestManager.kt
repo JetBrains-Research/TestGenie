@@ -6,8 +6,10 @@ import com.google.gson.JsonParser
 import com.intellij.openapi.project.Project
 import com.intellij.util.io.HttpRequests
 import com.intellij.util.io.HttpRequests.HttpStatusException
-import org.jetbrains.research.testspark.bundles.llm.LLMMessagesBundle
 import org.jetbrains.research.testspark.core.data.ChatMessage
+import org.jetbrains.research.testspark.core.error.LlmError
+import org.jetbrains.research.testspark.core.error.TestSparkError
+import org.jetbrains.research.testspark.core.error.TestSparkResult
 import org.jetbrains.research.testspark.core.monitor.ErrorMonitor
 import org.jetbrains.research.testspark.core.progress.CustomProgressIndicator
 import org.jetbrains.research.testspark.core.test.TestsAssembler
@@ -34,7 +36,7 @@ class OpenAIRequestManager(project: Project) : IJRequestManager(project) {
         indicator: CustomProgressIndicator,
         testsAssembler: TestsAssembler,
         errorMonitor: ErrorMonitor,
-    ): SendResult {
+    ): TestSparkResult<Unit, TestSparkError> {
         // Prepare the chat
         val messages = chatHistory.map {
             val role = when (it.role) {
@@ -46,9 +48,7 @@ class OpenAIRequestManager(project: Project) : IJRequestManager(project) {
 
         val llmRequestBody = OpenAIRequestBody(LlmSettingsArguments(project).getModel(), messages)
 
-        var sendResult = SendResult.OK
-
-        try {
+        return try {
             httpRequest.connect { request ->
                 // send request to OpenAI API
                 request.write(GsonBuilder().create().toJson(llmRequestBody))
@@ -57,51 +57,30 @@ class OpenAIRequestManager(project: Project) : IJRequestManager(project) {
 
                 // check response
                 when (val responseCode = connection.responseCode) {
-                    HttpURLConnection.HTTP_OK -> {
-                        assembleLlmResponse(request, testsAssembler, indicator, errorMonitor)
-                    }
+                    HttpURLConnection.HTTP_OK -> TestSparkResult.Success(
+                        data = assembleLlmResponse(request, testsAssembler, indicator, errorMonitor)
+                    )
 
-                    HttpURLConnection.HTTP_INTERNAL_ERROR -> {
-                        llmErrorManager.errorProcess(
-                            LLMMessagesBundle.get("serverProblems"),
-                            project,
-                            errorMonitor,
-                        )
-                        sendResult = SendResult.OTHER
-                    }
+                    HttpURLConnection.HTTP_INTERNAL_ERROR -> TestSparkResult.Failure(
+                        error = LlmError.HttpInternalError()
+                    )
 
-                    HttpURLConnection.HTTP_BAD_REQUEST -> {
-                        llmErrorManager.warningProcess(
-                            LLMMessagesBundle.get("tooLongPrompt"),
-                            project,
-                        )
-                        sendResult = SendResult.PROMPT_TOO_LONG
-                    }
+                    HttpURLConnection.HTTP_BAD_REQUEST -> TestSparkResult.Failure(
+                        error = LlmError.PromptTooLong()
+                    )
 
-                    HttpURLConnection.HTTP_UNAUTHORIZED -> {
-                        llmErrorManager.errorProcess(
-                            LLMMessagesBundle.get("wrongToken"),
-                            project,
-                            errorMonitor,
-                        )
-                        sendResult = SendResult.OTHER
-                    }
+                    HttpURLConnection.HTTP_UNAUTHORIZED -> TestSparkResult.Failure(
+                        error = LlmError.HttpUnauthorized()
+                    )
 
-                    else -> {
-                        llmErrorManager.errorProcess(
-                            llmErrorManager.createRequestErrorMessage(responseCode),
-                            project,
-                            errorMonitor,
-                        )
-                        sendResult = SendResult.OTHER
-                    }
+                    else -> TestSparkResult.Failure(
+                        error = LlmError.HttpError(httpCode = responseCode)
+                    )
                 }
             }
         } catch (e: HttpStatusException) {
-            log.info { "Error in sending request: ${e.message}" }
+            TestSparkResult.Failure(LlmError.HttpStatusError(e))
         }
-
-        return sendResult
     }
 
     /**

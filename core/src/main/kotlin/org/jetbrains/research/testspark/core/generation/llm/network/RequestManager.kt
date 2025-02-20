@@ -4,19 +4,17 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.research.testspark.core.data.ChatAssistantMessage
 import org.jetbrains.research.testspark.core.data.ChatMessage
 import org.jetbrains.research.testspark.core.data.ChatUserMessage
+import org.jetbrains.research.testspark.core.error.LlmError
+import org.jetbrains.research.testspark.core.error.TestSparkError
+import org.jetbrains.research.testspark.core.error.TestSparkResult
 import org.jetbrains.research.testspark.core.monitor.DefaultErrorMonitor
 import org.jetbrains.research.testspark.core.monitor.ErrorMonitor
 import org.jetbrains.research.testspark.core.progress.CustomProgressIndicator
 import org.jetbrains.research.testspark.core.test.SupportedLanguage
 import org.jetbrains.research.testspark.core.test.TestsAssembler
+import org.jetbrains.research.testspark.core.test.data.TestSuiteGeneratedByLLM
 
 abstract class RequestManager(var token: String) {
-    enum class SendResult {
-        OK,
-        PROMPT_TOO_LONG,
-        OTHER,
-    }
-
     val chatHistory = mutableListOf<ChatMessage>()
 
     protected val log = KotlinLogging.logger {}
@@ -38,7 +36,7 @@ abstract class RequestManager(var token: String) {
         testsAssembler: TestsAssembler,
         isUserFeedback: Boolean = false,
         errorMonitor: ErrorMonitor = DefaultErrorMonitor(), // The plugin for other IDEs can send LLM requests without passing an errorMonitor
-    ): LLMResponse {
+    ): TestSparkResult<TestSuiteGeneratedByLLM, TestSparkError> {
         // save the prompt in chat history
         chatHistory.add(ChatUserMessage(prompt))
 
@@ -47,9 +45,7 @@ abstract class RequestManager(var token: String) {
 
         val sendResult = send(prompt, indicator, testsAssembler, errorMonitor)
 
-        if (sendResult == SendResult.PROMPT_TOO_LONG) {
-            return LLMResponse(ResponseErrorCode.PROMPT_TOO_LONG, null)
-        }
+        if (sendResult is TestSparkResult.Failure) return sendResult
 
         // we remove the user request because we don't store user's requests in chat history
         if (isUserFeedback) {
@@ -66,7 +62,7 @@ abstract class RequestManager(var token: String) {
         testsAssembler: TestsAssembler,
         packageName: String,
         language: SupportedLanguage,
-    ): LLMResponse {
+    ): TestSparkResult<TestSuiteGeneratedByLLM, TestSparkError> {
         // save the full response in the chat history
         val response = testsAssembler.getContent()
 
@@ -75,15 +71,15 @@ abstract class RequestManager(var token: String) {
 
         // check if the response is empty
         if (response.isEmpty() || response.isBlank()) {
-            return LLMResponse(ResponseErrorCode.EMPTY_LLM_RESPONSE, null)
+            return TestSparkResult.Failure(error = LlmError.EmptyLlmResponse())
         }
 
         val testSuiteGeneratedByLLM = testsAssembler.assembleTestSuite()
 
         return if (testSuiteGeneratedByLLM == null) {
-            LLMResponse(ResponseErrorCode.TEST_SUITE_PARSING_FAILURE, null)
+            TestSparkResult.Failure(error = LlmError.TestSuiteParsingError())
         } else {
-            LLMResponse(ResponseErrorCode.OK, testSuiteGeneratedByLLM.reformat())
+            TestSparkResult.Success(data = testSuiteGeneratedByLLM.reformat())
         }
     }
 
@@ -92,28 +88,28 @@ abstract class RequestManager(var token: String) {
         indicator: CustomProgressIndicator,
         testsAssembler: TestsAssembler,
         errorMonitor: ErrorMonitor = DefaultErrorMonitor(),
-    ): SendResult
+    ): TestSparkResult<Unit, TestSparkError>
 
     open fun processUserFeedbackResponse(
         testsAssembler: TestsAssembler,
         packageName: String,
         language: SupportedLanguage,
-    ): LLMResponse {
+    ): TestSparkResult<TestSuiteGeneratedByLLM, TestSparkError> {
         val response = testsAssembler.getContent()
 
         log.info { "The full response: \n $response" }
 
         // check if the response is empty
         if (response.isEmpty() || response.isBlank()) {
-            return LLMResponse(ResponseErrorCode.EMPTY_LLM_RESPONSE, null)
+            return TestSparkResult.Failure(error = LlmError.EmptyLlmResponse())
         }
 
         val testSuiteGeneratedByLLM = testsAssembler.assembleTestSuite()
 
         return if (testSuiteGeneratedByLLM == null) {
-            LLMResponse(ResponseErrorCode.TEST_SUITE_PARSING_FAILURE, null)
+            TestSparkResult.Failure(error = LlmError.TestSuiteParsingError())
         } else {
-            LLMResponse(ResponseErrorCode.OK, testSuiteGeneratedByLLM)
+            TestSparkResult.Success(data = testSuiteGeneratedByLLM.reformat())
         }
     }
 }

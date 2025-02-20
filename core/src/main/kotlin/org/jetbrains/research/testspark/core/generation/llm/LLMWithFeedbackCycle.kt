@@ -3,9 +3,10 @@ package org.jetbrains.research.testspark.core.generation.llm
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.jetbrains.research.testspark.core.data.Report
 import org.jetbrains.research.testspark.core.data.TestCase
-import org.jetbrains.research.testspark.core.generation.llm.network.LLMResponse
+import org.jetbrains.research.testspark.core.error.LlmError
+import org.jetbrains.research.testspark.core.error.TestSparkError
+import org.jetbrains.research.testspark.core.error.TestSparkResult
 import org.jetbrains.research.testspark.core.generation.llm.network.RequestManager
-import org.jetbrains.research.testspark.core.generation.llm.network.ResponseErrorCode
 import org.jetbrains.research.testspark.core.generation.llm.prompt.PromptSizeReductionStrategy
 import org.jetbrains.research.testspark.core.monitor.DefaultErrorMonitor
 import org.jetbrains.research.testspark.core.monitor.ErrorMonitor
@@ -19,14 +20,6 @@ import org.jetbrains.research.testspark.core.test.data.TestCaseGeneratedByLLM
 import org.jetbrains.research.testspark.core.test.data.TestSuiteGeneratedByLLM
 import java.io.File
 
-enum class FeedbackCycleExecutionResult {
-    OK,
-    NO_COMPILABLE_TEST_CASES_GENERATED,
-    CANCELED,
-    PROVIDED_PROMPT_TOO_LONG,
-    SAVING_TEST_FILES_ISSUE,
-}
-
 /**
  * Represents a response (result) of a feedback cycle.
  *
@@ -37,20 +30,9 @@ enum class FeedbackCycleExecutionResult {
  * @throws IllegalArgumentException if `executionResult` is [FeedbackCycleExecutionResult.OK] and `generatedTestSuite` is null.
  */
 data class FeedbackResponse(
-    val executionResult: FeedbackCycleExecutionResult,
-    val generatedTestSuite: TestSuiteGeneratedByLLM?,
+    val generatedTestSuite: TestSuiteGeneratedByLLM,
     val compilableTestCases: MutableSet<TestCaseGeneratedByLLM>,
-) {
-    init {
-        if ((executionResult == FeedbackCycleExecutionResult.OK || executionResult == FeedbackCycleExecutionResult.NO_COMPILABLE_TEST_CASES_GENERATED) &&
-            (generatedTestSuite == null)
-        ) {
-            throw IllegalArgumentException(
-                "Test suite must be provided when FeedbackCycleExecutionResult is OK or NO_COMPILABLE_TEST_CASES_GENERATED (currently, ${executionResult.name}), got null",
-            )
-        }
-    }
-}
+)
 
 /**
  * LLMWithFeedbackCycle class represents a feedback cycle for an LLM.
@@ -101,12 +83,11 @@ class LLMWithFeedbackCycle(
 
     private val log = KotlinLogging.logger { this::class.java }
 
-    fun run(onWarningCallback: ((WarningType) -> Unit)? = null): FeedbackResponse {
+    fun run(onWarningCallback: ((WarningType) -> Unit)? = null): TestSparkResult<FeedbackResponse, TestSparkError> {
         var requestsCount = 0
         var generatedTestsArePassing = false
         var nextPromptMessage = initialPromptMessage
 
-        var executionResult = FeedbackCycleExecutionResult.OK
         val compilableTestCases: MutableSet<TestCaseGeneratedByLLM> = mutableSetOf()
 
         // collect imports from all responses
@@ -121,12 +102,11 @@ class LLMWithFeedbackCycle(
 
             // Process stopped checking
             if (indicator.isCanceled()) {
-                executionResult = FeedbackCycleExecutionResult.CANCELED
+                return TestSparkResult.Failure(error = LlmError.FeedbackCycleCancelled())
                 break
             }
 
             if (isLastIteration(requestsCount) && compilableTestCases.isEmpty()) {
-                executionResult = FeedbackCycleExecutionResult.NO_COMPILABLE_TEST_CASES_GENERATED
                 // record a report with parsable yet potentially
                 // non-compilable test cases stored in
                 // the generated test suite
@@ -137,7 +117,7 @@ class LLMWithFeedbackCycle(
 
             // clearing test assembler's collected text on the previous attempts
             testsAssembler.clear()
-            val response: LLMResponse = requestManager.request(
+            val response: TestSparkResult<TestSuiteGeneratedByLLM, TestSparkError> = requestManager.request(
                 language = language,
                 prompt = nextPromptMessage,
                 indicator = indicator,
@@ -149,15 +129,15 @@ class LLMWithFeedbackCycle(
 
             // Process stopped checking
             if (indicator.isCanceled()) {
-                executionResult = FeedbackCycleExecutionResult.CANCELED
+                return TestSparkResult.Failure(error = LlmError.FeedbackCycleCancelled())
                 break
             }
 
-            when (response.errorCode) {
-                ResponseErrorCode.OK -> {
-                    log.info { "Test suite generated successfully: ${response.testSuite!!}" }
+            when (response) {
+                is TestSparkResult.Success -> {
+                    log.info { "Test suite generated successfully: ${response.data!!}" }
                     // check that there are some test cases generated
-                    if (response.testSuite!!.testCases.isEmpty()) {
+                    if (response.data!!.testCases.isEmpty()) {
                         onWarningCallback?.invoke(WarningType.NO_TEST_CASES_GENERATED)
 
                         nextPromptMessage =
@@ -166,46 +146,49 @@ class LLMWithFeedbackCycle(
                     }
                 }
 
-                ResponseErrorCode.PROMPT_TOO_LONG -> {
-                    if (promptSizeReductionStrategy.isReductionPossible()) {
-                        nextPromptMessage = promptSizeReductionStrategy.reduceSizeAndGeneratePrompt()
-                        /**
-                         * The current attempt does not count as a failure
-                         * since it was rejected due to the prompt size
-                         * exceeding the threshold
-                         */
-                        requestsCount--
-                        continue
-                    } else {
-                        executionResult = FeedbackCycleExecutionResult.PROVIDED_PROMPT_TOO_LONG
-                        break
+                is TestSparkResult.Failure -> {
+                    when (response.error) {
+                        is LlmError.EmptyLlmResponse -> {
+                            nextPromptMessage =
+                                "You have provided an empty answer! Please, answer my previous question with the same formats"
+                            continue
+                        }
+
+                        is LlmError.PromptTooLong -> {
+                            if (promptSizeReductionStrategy.isReductionPossible()) {
+                                nextPromptMessage = promptSizeReductionStrategy.reduceSizeAndGeneratePrompt()
+                                /**
+                                 * The current attempt does not count as a failure
+                                 * since it was rejected due to the prompt size
+                                 * exceeding the threshold
+                                 */
+                                requestsCount--
+                                continue
+                            } else {
+                                return TestSparkResult.Failure(error = LlmError.PromptTooLong())
+                            }
+                        }
+
+                        is LlmError.TestSuiteParsingError -> {
+                            onWarningCallback?.invoke(WarningType.TEST_SUITE_PARSING_FAILED)
+                            log.info { "Cannot parse a test suite from the LLM response. LLM response: '$response'" }
+
+                            nextPromptMessage = "The provided code is not parsable. Please, generate the correct code"
+                            continue
+                        }
                     }
-                }
-
-                ResponseErrorCode.EMPTY_LLM_RESPONSE -> {
-                    nextPromptMessage =
-                        "You have provided an empty answer! Please, answer my previous question with the same formats"
-                    continue
-                }
-
-                ResponseErrorCode.TEST_SUITE_PARSING_FAILURE -> {
-                    onWarningCallback?.invoke(WarningType.TEST_SUITE_PARSING_FAILED)
-                    log.info { "Cannot parse a test suite from the LLM response. LLM response: '$response'" }
-
-                    nextPromptMessage = "The provided code is not parsable. Please, generate the correct code"
                     continue
                 }
             }
 
-            generatedTestSuite = response.testSuite
+            generatedTestSuite = response.data
 
             // update imports list
             imports.addAll(generatedTestSuite.imports)
 
             // Process stopped checking
             if (indicator.isCanceled()) {
-                executionResult = FeedbackCycleExecutionResult.CANCELED
-                break
+                return TestSparkResult.Failure(error = LlmError.FeedbackCycleCancelled())
             }
 
             // Save the generated TestSuite into a temp file
@@ -247,8 +230,7 @@ class LLMWithFeedbackCycle(
             }
             if (!(allFilesCreated && File(generatedTestSuitePath).exists())) {
                 // either some test case file or the test suite file was not created
-                executionResult = FeedbackCycleExecutionResult.SAVING_TEST_FILES_ISSUE
-                break
+                return TestSparkResult.Failure(error = LlmError.FailedToSaveTestFiles())
             }
 
             // Get test cases
@@ -272,8 +254,7 @@ class LLMWithFeedbackCycle(
 
             // Process stopped checking
             if (indicator.isCanceled()) {
-                executionResult = FeedbackCycleExecutionResult.CANCELED
-                break
+                return TestSparkResult.Failure(error = LlmError.FeedbackCycleCancelled())
             }
 
             if (!testCasesCompilationResult.allTestCasesCompilable && !isLastIteration(requestsCount)) {
@@ -301,17 +282,11 @@ class LLMWithFeedbackCycle(
             recordReport(report, testCases)
         }
 
-        // test suite must not be provided upon failed execution
-        if (executionResult != FeedbackCycleExecutionResult.OK &&
-            executionResult != FeedbackCycleExecutionResult.NO_COMPILABLE_TEST_CASES_GENERATED
-        ) {
-            generatedTestSuite = null
-        }
-
-        return FeedbackResponse(
-            executionResult = executionResult,
-            generatedTestSuite = generatedTestSuite,
-            compilableTestCases = compilableTestCases,
+        return TestSparkResult.Success(
+            data = FeedbackResponse(
+                generatedTestSuite = generatedTestSuite!!,
+                compilableTestCases = compilableTestCases,
+            )
         )
     }
 

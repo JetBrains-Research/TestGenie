@@ -7,8 +7,9 @@ import com.intellij.openapi.roots.ProjectRootManager
 import org.jetbrains.research.testspark.bundles.llm.LLMMessagesBundle
 import org.jetbrains.research.testspark.bundles.plugin.PluginMessagesBundle
 import org.jetbrains.research.testspark.core.data.TestGenerationData
+import org.jetbrains.research.testspark.core.error.LlmError
+import org.jetbrains.research.testspark.core.error.TestSparkResult
 import org.jetbrains.research.testspark.core.exception.JavaSDKMissingException
-import org.jetbrains.research.testspark.core.generation.llm.FeedbackCycleExecutionResult
 import org.jetbrains.research.testspark.core.generation.llm.LLMWithFeedbackCycle
 import org.jetbrains.research.testspark.core.generation.llm.getImportsCodeFromTestSuiteCode
 import org.jetbrains.research.testspark.core.generation.llm.getPackageFromTestSuiteCode
@@ -199,33 +200,41 @@ class LLMProcessManager(
 
         // Process stopped checking
         if (ToolUtils.isProcessStopped(errorMonitor, indicator)) return null
-        log.info("Feedback cycle finished execution with ${feedbackResponse.executionResult} result code")
+//        log.info("Feedback cycle finished execution with ${feedbackResponse.executionResult} result code")
 
-        when (feedbackResponse.executionResult) {
-            FeedbackCycleExecutionResult.OK -> {
-                log.info("Add ${feedbackResponse.compilableTestCases.size} compilable test cases into generatedTestsData")
+        when (feedbackResponse) {
+            is TestSparkResult.Success -> {
+                log.info("Add ${feedbackResponse.data.compilableTestCases.size} compilable test cases into generatedTestsData")
             }
 
-            FeedbackCycleExecutionResult.NO_COMPILABLE_TEST_CASES_GENERATED -> {
-                if (feedbackResponse.generatedTestSuite != null) {
-                    llmErrorManager.warningProcess(LLMMessagesBundle.get("noCompilableTestCases"), project)
-                } else {
-                    llmErrorManager.errorProcess(LLMMessagesBundle.get("invalidLLMResult"), project, errorMonitor)
+            is TestSparkResult.Failure -> {
+                when (feedbackResponse.error) {
+                    is LlmError.NoCompilableTestCasesGenerated -> {
+                        llmErrorManager.errorProcess(LLMMessagesBundle.get("invalidLLMResult"), project, errorMonitor)
+                    }
+
+                    is LlmError.FeedbackCycleCancelled -> {
+                        log.info("Process stopped")
+                        return null
+                    }
+
+                    is LlmError.PromptTooLong -> {
+                        llmErrorManager.errorProcess(
+                            LLMMessagesBundle.get("tooLongPromptRequest"),
+                            project,
+                            errorMonitor
+                        )
+                        return null
+                    }
+
+                    is LlmError.FailedToSaveTestFiles -> {
+                        llmErrorManager.errorProcess(
+                            LLMMessagesBundle.get("savingTestFileIssue"),
+                            project,
+                            errorMonitor
+                        )
+                    }
                 }
-            }
-
-            FeedbackCycleExecutionResult.CANCELED -> {
-                log.info("Process stopped")
-                return null
-            }
-
-            FeedbackCycleExecutionResult.PROVIDED_PROMPT_TOO_LONG -> {
-                llmErrorManager.errorProcess(LLMMessagesBundle.get("tooLongPromptRequest"), project, errorMonitor)
-                return null
-            }
-
-            FeedbackCycleExecutionResult.SAVING_TEST_FILES_ISSUE -> {
-                llmErrorManager.errorProcess(LLMMessagesBundle.get("savingTestFileIssue"), project, errorMonitor)
             }
         }
 
@@ -237,7 +246,7 @@ class LLMProcessManager(
         log.info("Save generated test suite and test cases into the project workspace")
 
         val testSuitePresenter = JUnitTestSuitePresenter(project, generatedTestsData, language)
-        val generatedTestSuite: TestSuiteGeneratedByLLM? = feedbackResponse.generatedTestSuite
+        val generatedTestSuite: TestSuiteGeneratedByLLM? = feedbackResponse.getDataOrNull()?.generatedTestSuite
         val testSuiteRepresentation =
             if (generatedTestSuite != null) testSuitePresenter.toString(generatedTestSuite) else null
 
