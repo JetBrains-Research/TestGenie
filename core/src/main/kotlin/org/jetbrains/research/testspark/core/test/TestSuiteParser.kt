@@ -1,13 +1,13 @@
 package org.jetbrains.research.testspark.core.test
 
-import org.jetbrains.research.testspark.core.test.data.TestCaseGeneratedByLLM
 import org.jetbrains.research.testspark.core.test.data.TestSuiteGeneratedByLLM
 
-data class TestCaseParseResult(
-    val testCase: TestCaseGeneratedByLLM?,
-    val errorMessage: String,
-    val errorOccurred: Boolean,
+data class OperationResult<Payload>(
+    val content: Payload? = null,
+    val error: ErrorDetails? = null,
 )
+
+data class ErrorDetails(val message: String)
 
 interface TestSuiteParser {
     /**
