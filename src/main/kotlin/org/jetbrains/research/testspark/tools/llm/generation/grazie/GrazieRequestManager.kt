@@ -5,13 +5,16 @@ import org.jetbrains.research.testspark.core.data.ChatMessage
 import org.jetbrains.research.testspark.core.error.LlmError
 import org.jetbrains.research.testspark.core.error.TestSparkError
 import org.jetbrains.research.testspark.core.error.TestSparkResult
+import org.jetbrains.research.testspark.core.generation.llm.network.RequestManager
 import org.jetbrains.research.testspark.core.monitor.ErrorMonitor
 import org.jetbrains.research.testspark.core.progress.CustomProgressIndicator
 import org.jetbrains.research.testspark.core.test.TestsAssembler
 import org.jetbrains.research.testspark.tools.llm.LlmSettingsArguments
-import org.jetbrains.research.testspark.tools.llm.generation.IJRequestManager
 
-class GrazieRequestManager(project: Project) : IJRequestManager(project) {
+class GrazieRequestManager(project: Project) : RequestManager(
+    token = LlmSettingsArguments(project).getToken(),
+    llmModel = LlmSettingsArguments(project).getModel(),
+) {
     override fun send(
         prompt: String,
         indicator: CustomProgressIndicator,
@@ -22,7 +25,7 @@ class GrazieRequestManager(project: Project) : IJRequestManager(project) {
             val className = "org.jetbrains.research.grazie.Request"
             val request: GrazieRequest = Class.forName(className).getDeclaredConstructor().newInstance() as GrazieRequest
 
-            val requestError = request.request(token, getMessages(), LlmSettingsArguments(project).getModel(), testsAssembler)
+            val requestError = request.request(token, getMessages(), llmModel, testsAssembler)
 
             if (requestError.isNotEmpty()) {
                 with(requestError) {

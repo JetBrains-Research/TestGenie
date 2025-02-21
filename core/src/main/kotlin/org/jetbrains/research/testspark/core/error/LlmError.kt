@@ -10,7 +10,8 @@ sealed class LlmError(cause: Throwable? = null) : TestSparkError(cause) {
     class FailedToSaveTestFiles() : LlmError()
     class HttpInternalError() : LlmError()
     class HttpUnauthorized() : LlmError()
-    class HttpStatusError(cause: Throwable? = null): LlmError()
+    class HttpStatusError(cause: Throwable? = null): LlmError(cause)
     class HttpError(val httpCode: Int): LlmError()
     class GrazieHttpError(val error: String) : LlmError()
+    class HuggingFaceServerError() : LlmError()
 }

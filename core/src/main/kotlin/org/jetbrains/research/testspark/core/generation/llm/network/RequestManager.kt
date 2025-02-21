@@ -14,7 +14,10 @@ import org.jetbrains.research.testspark.core.test.SupportedLanguage
 import org.jetbrains.research.testspark.core.test.TestsAssembler
 import org.jetbrains.research.testspark.core.test.data.TestSuiteGeneratedByLLM
 
-abstract class RequestManager(var token: String) {
+abstract class RequestManager(
+    var token: String,
+    val llmModel: String,
+) {
     val chatHistory = mutableListOf<ChatMessage>()
 
     protected val log = KotlinLogging.logger {}
