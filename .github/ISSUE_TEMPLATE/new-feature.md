@@ -2,7 +2,7 @@
 name: New feature
 about: Create an issue for a new feature
 title: ''
-labels: 'type: enhancement'
+labels: 'new feature'
 assignees: ''
 
 ---

@@ -2,7 +2,7 @@
 name: Refactoring
 about: Suggest refactoring of some code
 title: ''
-labels: 'type: refactoring'
+labels: 'refactoring'
 assignees: ''
 
 ---

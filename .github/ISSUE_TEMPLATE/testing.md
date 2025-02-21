@@ -2,7 +2,7 @@
 name: Testing
 about: Suggest covering some code with tests
 title: ''
-labels: 'type: testing'
+labels: 'testing'
 assignees: ''
 
 ---

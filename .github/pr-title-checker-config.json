@@ -1,0 +1,12 @@
+{
+  "CHECKS": {
+    "prefixes": [],
+    "regexp": "^\\[[^\\]]+\\] .+",
+    "regexpFlags": "i"
+  },
+  "MESSAGES": {
+    "success": "All OK: The PR title formatting is correct",
+    "failure": "Incorrect PR title formatting",
+    "notice": ""
+  }
+}

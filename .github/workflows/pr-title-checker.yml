@@ -1,0 +1,37 @@
+name: "PR Title Checker"
+on:
+  pull_request_target:
+    types:
+      - opened
+      - edited
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: thehanimo/pr-title-checker@v1.4.3
+        id: check
+        continue-on-error: true
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          pass_on_octokit_error: false
+
+      - name: Add comment to inform user about the incorrect PR title format
+        uses: marocchino/sticky-pull-request-comment@v2
+        if: ${{ steps.check.outputs.success == 'false'}}
+        with:
+          header: 'PR Title Check'
+          recreate: true
+          message: |
+            ### 🚨 PR Title Needs Formatting
+            Please specify the modified module and, preferrably, include a GitHub or YouTrack issue that this PR closes in the title. By `module`, we mean any logical part of the project — it doesn’t have to be a Gradle module or anything like that.
+            Use the following format: `[<Module(s)>] and(or) [<ISSUE-ID>] brief title`. Examples:
+            * `[LLM] Add support for Google AI as an LLM`
+            * `[Build] Update IntelliJ Platform version`
+            * `[#290]` Fix bug with LLM response parsing`
+            * `[PromptBuilder] [JBRes-2860] Refactor the PromptBuilder component`

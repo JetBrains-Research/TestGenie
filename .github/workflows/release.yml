@@ -84,7 +84,7 @@ jobs:
           git push --set-upstream origin $BRANCH
 
           gh pr create \
-            --title "Changelog update - \`$VERSION\`" \
+            --title "[Release] Changelog update - \`$VERSION\`" \
             --body "Current pull request contains patched \`CHANGELOG.md\` file for the \`$VERSION\` version." \
             --base main \
             --head $BRANCH
